@@ -32,7 +32,48 @@
 <body class="bg-slate-50 text-gray-800">
     <div id="root"></div>
 
-    <script type="text/babel">
+    <!-- MAIN SCRIPT: data-type="module" is required for Firebase Imports -->
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
+        import { 
+            getAuth, 
+            signInWithPopup, 
+            GoogleAuthProvider, 
+            signInWithEmailAndPassword, 
+            signOut, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            getDocs, 
+            updateDoc, 
+            doc, 
+            onSnapshot,
+            query, 
+            where 
+        } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyC8YsDjof0BjtQOZ4Clx7pCSSXNCa7DQp0",
+            authDomain: "payment-portal-479614.firebaseapp.com",
+            projectId: "payment-portal-479614",
+            storageBucket: "payment-portal-479614.firebasestorage.app",
+            messagingSenderId: "857909670758",
+            appId: "1:857909670758:web:6e5ed6a04c53e11c27cea7",
+            measurementId: "G-0W6T5ZYR7Q"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
+
         const { useState, useEffect, useMemo } = React;
 
         // --- ICONS ---
@@ -52,60 +93,34 @@
         const FileText = (p) => <IconWrapper {...p}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></IconWrapper>;
         const Trash2 = (p) => <IconWrapper {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconWrapper>;
         const ChevronLeft = (p) => <IconWrapper {...p}><path d="m15 18-6-6 6-6"/></IconWrapper>;
+        const Wallet = (p) => <IconWrapper {...p}><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></IconWrapper>;
+        const ExternalLink = (p) => <IconWrapper {...p}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" x2="21" y1="14" y2="3" /></IconWrapper>;
 
 
         // --- CONFIG & CONSTANTS ---
         const LOGO_URL = "https://imageview.replit.app/objects/uploads/d16ab63e-1d1e-4b8f-863c-67e66e4894fc";
         
-        // --- DATA MANAGER (Simulated Database) ---
-        // In a real app, this would be API calls to a backend.
+        // --- REAL WORLD LINKS ---
+        const STRIPE_LINK = "https://buy.stripe.com/bIY01kg5K3zD5I4fYY?_gl=1*1drrzbk*_ga*MjA1MzE1MDM4OS4xNzY0MDk4ODc4*_ga_0G63KLB2B0*czE3NjQxMDQwODgkbzEkZzEkdDE3NjQxMDQxOTckajU2JGwwJGgw";
+        const MOONPAY_BASE_URL = "https://buy.moonpay.com";
+        const MOONPAY_API_KEY = "pk_test_YOUR_MOONPAY_KEY"; 
+        
+        // --- FIRESTORE DATABASE HELPERS ---
+        // These replace the localStorage 'DB' object with real Cloud Firestore calls
         const DB = {
-            init: () => {
-                if (!localStorage.getItem('mt_customers')) {
-                    localStorage.setItem('mt_customers', JSON.stringify([
-                        { id: 1, name: "Alex Residential", email: "alex@example.com", address: "123 Maple St, Detroit, MI" },
-                        { id: 2, name: "Grand Office Park", email: "manager@grandoffice.com", address: "400 Business Blvd, Troy, MI" }
-                    ]));
+            addCustomer: async (customer) => {
+                // Generate a wallet address if not exists (In real production this comes from Web3Auth/WalletConnect)
+                if(!customer.walletAddress) {
+                    customer.walletAddress = "0x" + Math.floor(Math.random()*16777215).toString(16);
                 }
-                if (!localStorage.getItem('mt_invoices')) {
-                    localStorage.setItem('mt_invoices', JSON.stringify([
-                        { 
-                            id: "INV-2024-001", 
-                            customerId: 1, 
-                            date: "2024-10-24", 
-                            dueDate: "Upon Receipt", 
-                            status: "Pending", 
-                            items: [
-                                { desc: "Service Call", qty: 1, unitPrice: 85.00 },
-                                { desc: "Freon Refill", qty: 2, unitPrice: 75.00 }
-                            ]
-                        }
-                    ]));
-                }
+                return await addDoc(collection(db, "customers"), customer);
             },
-            getCustomers: () => JSON.parse(localStorage.getItem('mt_customers') || '[]'),
-            addCustomer: (customer) => {
-                const list = DB.getCustomers();
-                customer.id = Date.now(); // Simple ID generation
-                list.push(customer);
-                localStorage.setItem('mt_customers', JSON.stringify(list));
-                return list;
+            addInvoice: async (invoice) => {
+                return await addDoc(collection(db, "invoices"), invoice);
             },
-            getInvoices: () => JSON.parse(localStorage.getItem('mt_invoices') || '[]'),
-            addInvoice: (invoice) => {
-                const list = DB.getInvoices();
-                list.push(invoice);
-                localStorage.setItem('mt_invoices', JSON.stringify(list));
-                return list;
-            },
-            updateInvoiceStatus: (id, status) => {
-                const list = DB.getInvoices();
-                const idx = list.findIndex(i => i.id === id);
-                if (idx > -1) {
-                    list[idx].status = status;
-                    localStorage.setItem('mt_invoices', JSON.stringify(list));
-                }
-                return list;
+            updateInvoiceStatus: async (id, status) => {
+                const invoiceRef = doc(db, "invoices", id);
+                await updateDoc(invoiceRef, { status: status });
             }
         };
 
@@ -124,7 +139,7 @@
                             <span className="text-sm font-medium text-gray-900">{user.email}</span>
                         </div>
                         <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-white ${user.isAdmin ? 'bg-purple-600' : 'bg-blue-600'}`}>
-                            {user.isAdmin ? 'A' : user.name.charAt(0)}
+                            {user.isAdmin ? 'A' : user.name ? user.name.charAt(0) : 'U'}
                         </div>
                         <button onClick={onLogout} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Logout">
                             <LogOut size={18} />
@@ -134,34 +149,33 @@
             </nav>
         );
 
-        const LoginScreen = ({ onLogin }) => {
-            const [email, setEmail] = useState("admin@mechanicaltemp.com");
+        const LoginScreen = () => {
+            const [email, setEmail] = useState("");
+            const [password, setPassword] = useState("");
             const [isLoading, setIsLoading] = useState(false);
             const [error, setError] = useState("");
 
-            const handleLogin = (e) => {
+            const handleGoogleLogin = async () => {
+                setIsLoading(true);
+                setError("");
+                try {
+                    await signInWithPopup(auth, googleProvider);
+                } catch (err) {
+                    setError(err.message);
+                    setIsLoading(false);
+                }
+            };
+
+            const handleEmailLogin = async (e) => {
                 e.preventDefault();
                 setIsLoading(true);
                 setError("");
-                
-                setTimeout(() => {
-                    // 1. Check for Admin
-                    if (email.toLowerCase() === "admin@mechanicaltemp.com") {
-                        onLogin({ email, isAdmin: true, name: "Admin" });
-                        return;
-                    }
-
-                    // 2. Check for Customer
-                    const customers = DB.getCustomers();
-                    const customer = customers.find(c => c.email.toLowerCase() === email.toLowerCase());
-                    
-                    if (customer) {
-                        onLogin({ ...customer, isAdmin: false });
-                    } else {
-                        setError("User not found. Try 'admin@mechanicaltemp.com' or 'alex@example.com'");
-                        setIsLoading(false);
-                    }
-                }, 800);
+                try {
+                    await signInWithEmailAndPassword(auth, email, password);
+                } catch (err) {
+                    setError("Login failed. Please check credentials or sign up first.");
+                    setIsLoading(false);
+                }
             };
 
             return (
@@ -175,35 +189,58 @@
                             <p className="text-blue-100">Mechanical Temp LLC</p>
                         </div>
                         
-                        <form onSubmit={handleLogin} className="p-8 space-y-6">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-                                <input 
-                                    type="email" 
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                                    placeholder="Enter your email"
-                                />
-                            </div>
-                            
-                            {error && <p className="text-red-500 text-sm">{error}</p>}
-
+                        <div className="p-8 space-y-6">
+                            {/* Google Login */}
                             <button
-                                type="submit"
+                                onClick={handleGoogleLogin}
                                 disabled={isLoading}
-                                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-sm"
+                                className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 px-4 rounded-xl transition-all shadow-sm"
                             >
-                                {isLoading ? <Loader2 className="animate-spin" /> : "Sign In"}
+                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5"/>
+                                {isLoading ? "Connecting..." : "Sign in with Google"}
                             </button>
 
-                            <div className="bg-gray-50 p-4 rounded text-xs text-gray-500">
-                                <p className="font-bold mb-1">Demo Credentials:</p>
-                                <p>Admin: admin@mechanicaltemp.com</p>
-                                <p>Customer: alex@example.com</p>
+                            <div className="relative flex py-2 items-center">
+                                <div className="flex-grow border-t border-gray-200"></div>
+                                <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">OR EMAIL</span>
+                                <div className="flex-grow border-t border-gray-200"></div>
                             </div>
-                        </form>
+
+                            <form onSubmit={handleEmailLogin} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                                    <input 
+                                        type="email" 
+                                        required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="Enter your email"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                                    <input 
+                                        type="password" 
+                                        required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        placeholder="Enter password"
+                                    />
+                                </div>
+                                
+                                {error && <p className="text-red-500 text-sm">{error}</p>}
+
+                                <button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-sm"
+                                >
+                                    {isLoading ? <Loader2 className="animate-spin mx-auto" /> : "Sign In"}
+                                </button>
+                            </form>
+                        </div>
                     </div>
                 </div>
             );
@@ -212,14 +249,17 @@
         // --- ADMIN PANEL COMPONENTS ---
 
         const AdminDashboard = ({ customers, invoices, onAddCustomer, onAddInvoice }) => {
-            const [view, setView] = useState('dashboard'); // dashboard, add-customer, add-invoice
+            const [view, setView] = useState('dashboard');
             
-            // Sub-Components for Admin
             const AddCustomerForm = () => {
                 const [form, setForm] = useState({ name: "", email: "", address: "" });
-                const handleSubmit = (e) => {
+                const [saving, setSaving] = useState(false);
+
+                const handleSubmit = async (e) => {
                     e.preventDefault();
-                    onAddCustomer(form);
+                    setSaving(true);
+                    await onAddCustomer(form);
+                    setSaving(false);
                     setView('dashboard');
                 };
                 return (
@@ -241,7 +281,9 @@
                                 <label className="block text-sm font-medium text-gray-700">Billing Address</label>
                                 <textarea required className="w-full p-2 border rounded" value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
                             </div>
-                            <button className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold">Save Customer</button>
+                            <button disabled={saving} className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold">
+                                {saving ? "Saving..." : "Save Customer"}
+                            </button>
                         </form>
                     </div>
                 );
@@ -250,7 +292,8 @@
             const AddInvoiceForm = () => {
                 const [customerId, setCustomerId] = useState(customers[0]?.id || "");
                 const [items, setItems] = useState([{ desc: "", qty: 1, unitPrice: 0 }]);
-                
+                const [saving, setSaving] = useState(false);
+
                 const addItem = () => setItems([...items, { desc: "", qty: 1, unitPrice: 0 }]);
                 const updateItem = (idx, field, val) => {
                     const newItems = [...items];
@@ -259,19 +302,21 @@
                 };
                 const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
 
-                const handleSubmit = (e) => {
+                const handleSubmit = async (e) => {
                     e.preventDefault();
                     if(!customerId) return alert("Select a customer");
+                    setSaving(true);
                     
                     const newInvoice = {
                         id: `INV-${Date.now().toString().slice(-6)}`,
-                        customerId: parseInt(customerId),
+                        customerId: customerId, // Firestore ID
                         date: new Date().toISOString().split('T')[0],
                         dueDate: "Net 30",
                         status: "Pending",
                         items: items.map(i => ({...i, unitPrice: parseFloat(i.unitPrice), qty: parseFloat(i.qty)}))
                     };
-                    onAddInvoice(newInvoice);
+                    await onAddInvoice(newInvoice);
+                    setSaving(false);
                     setView('dashboard');
                 };
 
@@ -285,6 +330,7 @@
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Select Customer</label>
                                 <select className="w-full p-2 border rounded" value={customerId} onChange={e => setCustomerId(e.target.value)}>
+                                    <option value="">Select a Customer</option>
                                     {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                                 </select>
                             </div>
@@ -307,19 +353,19 @@
                                 <span className="font-bold text-xl">${items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0).toFixed(2)}</span>
                             </div>
 
-                            <button className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold">Generate Invoice</button>
+                            <button disabled={saving} className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold">
+                                {saving ? "Generating..." : "Generate Invoice"}
+                            </button>
                         </form>
                     </div>
                 );
             };
 
-            // Main Dashboard View
             if (view === 'add-customer') return <AddCustomerForm />;
             if (view === 'add-invoice') return <AddInvoiceForm />;
 
             return (
                 <div className="space-y-8">
-                    {/* Stats */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                             <p className="text-gray-500 text-sm font-medium">Total Revenue</p>
@@ -335,7 +381,6 @@
                         </div>
                     </div>
 
-                    {/* Actions */}
                     <div className="flex gap-4">
                         <button onClick={() => setView('add-invoice')} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition">
                             <FileText size={18} /> New Invoice
@@ -345,7 +390,6 @@
                         </button>
                     </div>
 
-                    {/* Invoice List */}
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 font-bold text-gray-700">All Invoices</div>
                         <div className="overflow-x-auto">
@@ -387,79 +431,9 @@
 
         // --- CUSTOMER PORTAL COMPONENTS ---
 
-        const MoonPayWidget = ({ amount, onClose, onComplete }) => {
-            const [step, setStep] = useState('loading');
-
-            useEffect(() => {
-                const timer = setTimeout(() => setStep('form'), 1500);
-                return () => clearTimeout(timer);
-            }, []);
-
-            const handlePay = () => {
-                setStep('processing');
-                setTimeout(() => {
-                    onComplete("0x" + Math.random().toString(16).substr(2, 40)); // Mock Hash
-                }, 3000);
-            };
-
-            return (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-                        <div className="bg-[#7D00FF] p-4 flex justify-between items-center text-white">
-                            <span className="font-bold tracking-tight">MoonPay</span>
-                            <button onClick={onClose} className="hover:bg-white/20 p-1 rounded">✕</button>
-                        </div>
-                        <div className="p-6 flex-1 overflow-y-auto min-h-[400px] flex flex-col relative">
-                            {step === 'loading' && (
-                                <div className="flex-1 flex flex-col items-center justify-center space-y-4">
-                                    <Loader2 className="w-8 h-8 text-[#7D00FF] animate-spin" />
-                                    <p className="text-gray-500 text-sm">Securely connecting...</p>
-                                </div>
-                            )}
-                            {step === 'form' && (
-                                <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
-                                    <div className="text-center mb-6">
-                                        <p className="text-gray-500 text-sm">Total Due</p>
-                                        <div className="text-3xl font-bold text-gray-900">${amount.toFixed(2)}</div>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <div className="border border-gray-200 rounded-lg p-3 flex items-center gap-3 border-[#7D00FF] bg-purple-50">
-                                            <div className="w-10 h-6 bg-blue-800 rounded flex items-center justify-center text-white text-[10px] font-bold">VISA</div>
-                                            <div className="flex-1">
-                                                <div className="text-sm font-medium">Visa ending in 4242</div>
-                                                <div className="text-xs text-gray-400">Expires 12/25</div>
-                                            </div>
-                                            <div className="w-4 h-4 rounded-full bg-[#7D00FF]"></div>
-                                        </div>
-                                        <div className="pt-4 border-t border-gray-100">
-                                            <div className="flex justify-between text-sm font-medium">
-                                                <span className="text-gray-900">Total Charge</span>
-                                                <span className="text-[#7D00FF]">${(amount + 2.45).toFixed(2)}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button onClick={handlePay} className="w-full mt-6 bg-[#7D00FF] hover:bg-[#6a00d8] text-white font-bold py-4 rounded-full shadow-lg">
-                                        Pay Now
-                                    </button>
-                                </div>
-                            )}
-                            {step === 'processing' && (
-                                <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
-                                    <Loader2 className="w-8 h-8 text-[#7D00FF] animate-spin" />
-                                    <div>
-                                        <h3 className="text-lg font-bold text-gray-900">Processing</h3>
-                                        <p className="text-gray-500 text-sm mt-1">Confirming transaction...</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
         const InvoiceDetail = ({ invoice, customer, onBack, onPaymentSuccess }) => {
-            const [showMoonPay, setShowMoonPay] = useState(false);
+            const [paymentMethod, setPaymentMethod] = useState('stripe');
+            
             const totalAmount = invoice.items.reduce((acc, item) => acc + (item.qty * item.unitPrice), 0);
             
             if (invoice.status === 'Paid') {
@@ -475,9 +449,18 @@
                 );
             }
 
+            const handlePayment = () => {
+                if (paymentMethod === 'stripe') {
+                    window.open(STRIPE_LINK, '_blank');
+                } else {
+                    const walletAddress = customer.walletAddress || "0x000000000000000000000000000000000000dead"; 
+                    const moonPayLink = `${MOONPAY_BASE_URL}?apiKey=${MOONPAY_API_KEY}&walletAddress=${walletAddress}&currencyCode=usdc&baseCurrencyAmount=${totalAmount}&baseCurrencyCode=usd`;
+                    window.open(moonPayLink, '_blank');
+                }
+            };
+
             return (
                 <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in slide-in-from-bottom-4">
-                    {/* Invoice View */}
                     <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                         <div className="flex justify-between items-start mb-8 pb-8 border-b border-gray-100">
                             <div>
@@ -540,29 +523,58 @@
                         </div>
                     </div>
 
-                    {/* Payment Sidebar */}
                     <div className="w-full lg:w-[380px] no-print">
                         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-24">
-                            <h3 className="font-bold text-gray-900 mb-4">Payment Method</h3>
-                            <div className="p-4 rounded-xl border-2 border-blue-600 bg-blue-50/50 cursor-pointer mb-6">
+                            <h3 className="font-bold text-gray-900 mb-4">Select Payment Method</h3>
+                            
+                            <div 
+                                onClick={() => setPaymentMethod('stripe')} 
+                                className={`p-4 rounded-xl border-2 cursor-pointer mb-3 transition-all ${paymentMethod === 'stripe' ? 'border-[#635BFF] bg-indigo-50' : 'border-gray-100 hover:border-gray-200'}`}
+                            >
                                 <div className="flex items-center gap-3">
-                                    <div className="bg-blue-600 text-white p-2 rounded-lg"><CreditCard size={20} /></div>
-                                    <div>
-                                        <p className="font-semibold text-blue-900">Credit Card</p>
-                                        <p className="text-xs text-gray-500">via MoonPay Secure Checkout</p>
+                                    <div className={`p-2 rounded-lg ${paymentMethod === 'stripe' ? 'bg-[#635BFF] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                        <CreditCard size={20} />
                                     </div>
-                                    <CheckCircle2 size={20} className="ml-auto text-blue-600" />
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-900">Credit Card</p>
+                                        <p className="text-xs text-gray-500">via Stripe Checkout</p>
+                                    </div>
+                                    {paymentMethod === 'stripe' && <CheckCircle2 size={20} className="ml-auto text-[#635BFF]" />}
                                 </div>
                             </div>
-                            <button onClick={() => setShowMoonPay(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02]">
-                                Pay ${totalAmount.toFixed(2)}
+
+                            <div 
+                                onClick={() => setPaymentMethod('moonpay')} 
+                                className={`p-4 rounded-xl border-2 cursor-pointer mb-6 transition-all ${paymentMethod === 'moonpay' ? 'border-[#7D00FF] bg-purple-50' : 'border-gray-100 hover:border-gray-200'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg ${paymentMethod === 'moonpay' ? 'bg-[#7D00FF] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                        <Wallet size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-900">Crypto / Card</p>
+                                        <p className="text-xs text-gray-500">via MoonPay Self-Custody</p>
+                                    </div>
+                                    {paymentMethod === 'moonpay' && <CheckCircle2 size={20} className="ml-auto text-[#7D00FF]" />}
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={handlePayment} 
+                                className={`w-full text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 ${paymentMethod === 'stripe' ? 'bg-[#635BFF] hover:bg-[#534be0]' : 'bg-[#7D00FF] hover:bg-[#6a00d8]'}`}
+                            >
+                                {paymentMethod === 'stripe' ? (
+                                    <>Pay via Stripe <ExternalLink size={18} /></>
+                                ) : (
+                                    <>Pay via MoonPay <ExternalLink size={18} /></>
+                                )}
                             </button>
+                            
                             <div className="flex items-center justify-center gap-2 mt-4 text-xs text-gray-400">
-                                <Lock size={12}/> 256-bit Encrypted
+                                <Lock size={12}/> Secure 256-bit Encrypted
                             </div>
                         </div>
                     </div>
-                    {showMoonPay && <MoonPayWidget amount={totalAmount} onClose={() => setShowMoonPay(false)} onComplete={() => { setShowMoonPay(false); onPaymentSuccess(); }} />}
                 </div>
             );
         };
@@ -570,8 +582,15 @@
         const CustomerDashboard = ({ user, invoices, onUpdateStatus }) => {
             const [selectedInvoice, setSelectedInvoice] = useState(null);
             
-            // Filter invoices for this customer only
-            const myInvoices = invoices.filter(i => i.customerId === user.id);
+            // For MVP: We check if the invoice's customerId matches the logged-in user's ID
+            // In a real database structure, you'd likely map email -> ID or use Email as ID
+            // Here, we try to match by email if ID logic is fuzzy in this transition
+            const myInvoices = invoices.filter(i => {
+                // If the customer object in DB matches current user email, get that ID
+                // But for now, let's assume 'customers' collection is loaded
+                // A better approach in production is querying Firestore: where("email", "==", user.email)
+                return true; // Simplified for this view, logic handled in App shell
+            });
 
             if (selectedInvoice) {
                 return (
@@ -591,7 +610,7 @@
                 <div className="max-w-4xl mx-auto">
                     <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Invoices</h2>
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                        {myInvoices.length === 0 ? (
+                        {invoices.length === 0 ? (
                             <div className="p-8 text-center text-gray-500">No invoices found.</div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -607,7 +626,7 @@
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
-                                        {myInvoices.map(inv => {
+                                        {invoices.map(inv => {
                                             const total = inv.items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0);
                                             return (
                                                 <tr key={inv.id} className="hover:bg-gray-50">
@@ -640,37 +659,92 @@
         // --- MAIN APP SHELL ---
         const App = () => {
             const [user, setUser] = useState(null);
-            const [dataTick, setDataTick] = useState(0); // Trigger re-render when data updates
+            const [customers, setCustomers] = useState([]);
+            const [invoices, setInvoices] = useState([]);
 
-            // Init Database Simulation
-            useEffect(() => { DB.init(); }, []);
+            // 1. Listen for Auth Changes
+            useEffect(() => {
+                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                    if (currentUser) {
+                        // Check if admin
+                        const isAdmin = currentUser.email === "admin@mechanicaltemp.com"; // Simple admin check
+                        
+                        setUser({
+                            uid: currentUser.uid,
+                            email: currentUser.email,
+                            name: currentUser.displayName,
+                            isAdmin: isAdmin
+                        });
+                    } else {
+                        setUser(null);
+                        setCustomers([]);
+                        setInvoices([]);
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
 
-            const handleAddCustomer = (c) => { DB.addCustomer(c); setDataTick(t => t+1); };
-            const handleAddInvoice = (i) => { DB.addInvoice(i); setDataTick(t => t+1); };
-            const handleUpdateStatus = (id, s) => { DB.updateInvoiceStatus(id, s); setDataTick(t => t+1); };
+            // 2. Listen for Database Changes (Real-Time Sync)
+            useEffect(() => {
+                if (!user) return;
 
-            const customers = DB.getCustomers();
-            const invoices = DB.getInvoices();
+                // Load Customers
+                const unsubCustomers = onSnapshot(collection(db, "customers"), (snapshot) => {
+                    const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setCustomers(list);
+                });
+
+                // Load Invoices
+                let q = collection(db, "invoices");
+                
+                // If Customer (not admin), filter invoices
+                // Note: For advanced security, use Firestore Rules + 'where' clause here
+                // For this demo, we filter client-side or assume admin sees all
+                
+                const unsubInvoices = onSnapshot(q, (snapshot) => {
+                    const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    
+                    if (user.isAdmin) {
+                        setInvoices(list);
+                    } else {
+                        // Match invoices to this customer
+                        // We need to match the logged in user's email to a customer record
+                        // Find customer record with this email
+                        const myCustomerRecord = customers.find(c => c.email === user.email);
+                        if (myCustomerRecord) {
+                             setInvoices(list.filter(inv => inv.customerId === myCustomerRecord.id));
+                        } else {
+                            // Fallback: if no customer record exists yet for this user
+                            setInvoices([]); 
+                        }
+                    }
+                });
+
+                return () => {
+                    unsubCustomers();
+                    unsubInvoices();
+                };
+            }, [user, customers.length]); // Re-run if user changes or customers list updates (to re-filter invoices)
 
             return (
                 <div className="min-h-screen pb-12">
-                    <Navbar user={user} onLogout={() => setUser(null)} />
+                    <Navbar user={user} onLogout={() => signOut(auth)} />
                     
                     <main className="container mx-auto px-4 py-8">
                         {!user ? (
-                            <LoginScreen onLogin={setUser} />
+                            <LoginScreen />
                         ) : user.isAdmin ? (
                             <AdminDashboard 
                                 customers={customers} 
                                 invoices={invoices} 
-                                onAddCustomer={handleAddCustomer}
-                                onAddInvoice={handleAddInvoice}
+                                onAddCustomer={DB.addCustomer}
+                                onAddInvoice={DB.addInvoice}
                             />
                         ) : (
                             <CustomerDashboard 
-                                user={user} 
+                                user={customers.find(c => c.email === user.email) || user} 
                                 invoices={invoices}
-                                onUpdateStatus={handleUpdateStatus}
+                                onUpdateStatus={DB.updateInvoiceStatus}
                             />
                         )}
                     </main>
