@@ -15,10 +15,10 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Ethers.js (v6 - Updated to match Partner Portal) -->
+    <!-- Ethers.js (v6) -->
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.11.1/dist/ethers.umd.min.js"></script>
 
-    <!-- Web3Auth (Updated to v9.4.4) -->
+    <!-- Web3Auth (v9.4.4) -->
     <script src="https://cdn.jsdelivr.net/npm/@web3auth/modal@9.4.4/dist/modal.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@web3auth/ethereum-provider@9.4.4/dist/ethereumProvider.umd.min.js"></script>
     
@@ -55,7 +55,7 @@
             where 
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-        // --- FIREBASE CONFIGURATION (Only for Database now) ---
+        // --- FIREBASE CONFIGURATION ---
         const firebaseConfig = {
             apiKey: "AIzaSyC8YsDjof0BjtQOZ4Clx7pCSSXNCa7DQp0",
             authDomain: "payment-portal-479614.firebaseapp.com",
@@ -199,7 +199,9 @@
                     
                     const web3auth = new Web3Auth({
                         clientId: WEB3AUTH_CLIENT_ID,
-                        web3AuthNetwork: "sapphire_mainnet",
+                        // UPDATED: Changed to 'sapphire_devnet' to fix validation error. 
+                        // If your dashboard specifically says 'Mainnet', change this back to 'sapphire_mainnet'.
+                        web3AuthNetwork: "sapphire_devnet",
                         privateKeyProvider
                     });
 
@@ -1017,7 +1019,31 @@
             const [customers, setCustomers] = useState([]);
             const [invoices, setInvoices] = useState([]);
 
-            // 1. Listen for Database Changes (Real-Time Sync)
+            // 1. Listen for Auth Changes
+            useEffect(() => {
+                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                    if (currentUser) {
+                        // Check if admin
+                        const isAdmin = currentUser.email === "admin@mechanicaltemp.com"; // Simple admin check
+                        
+                        setUser({
+                            uid: currentUser.uid,
+                            email: currentUser.email,
+                            name: currentUser.displayName,
+                            isAdmin: isAdmin
+                        });
+                    } else {
+                        // DO NOT reset user here immediately if it might be a wallet user
+                        // We handle wallet users via onWalletLogin which sets user manually
+                        // But if onAuthStateChanged fires null (e.g. logout), we should clear
+                        // Only clear if the current user state is NOT a wallet user (has no email, or is specific type)
+                        // Actually simpler: let logout button clear state
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // 2. Listen for Database Changes (Real-Time Sync)
             useEffect(() => {
                 if (!user) return;
 
