@@ -119,7 +119,8 @@
                     }));
                 }
             },
-            getVaultSettings: () => JSON.parse(localStorage.getItem('mt_vault_settings') || '{"percentage": 2}'),
+            // FIX: Added default address to fallback JSON to prevent crash on first load
+            getVaultSettings: () => JSON.parse(localStorage.getItem('mt_vault_settings') || '{"address": "0xdFD1C01678e713FDe1630c9db921e6206f3795b4", "percentage": 2}'),
             updateVaultSettings: (settings) => {
                 localStorage.setItem('mt_vault_settings', JSON.stringify(settings));
                 return settings;
@@ -159,7 +160,7 @@
                     <div className="flex items-center gap-4">
                         <div className="hidden md:flex flex-col items-end">
                             <span className="text-xs text-slate-400 uppercase tracking-wider">{user.isAdmin ? 'Administrator' : 'Customer'}</span>
-                            <span className="text-sm font-medium text-white">{user.email || user.walletAddress && user.walletAddress.substring(0,6)+'...'}</span>
+                            <span className="text-sm font-medium text-white">{user.email || (user.walletAddress && user.walletAddress.substring(0,6)+'...') || 'User'}</span>
                         </div>
                         <div className={`h-9 w-9 rounded-full flex items-center justify-center font-bold text-white shadow-lg ${user.isAdmin ? 'bg-purple-600' : 'bg-sky-500'}`}>
                             {user.isAdmin ? 'A' : user.name ? user.name.charAt(0) : 'U'}
@@ -967,7 +968,7 @@
                                 </div>
                                 <div>
                                     <p className="text-gray-500">Email</p>
-                                    <p className="font-medium">{user.email}</p>
+                                    <p className="font-medium">{user.email || "N/A (Wallet Login)"}</p>
                                 </div>
                                 <div>
                                     <p className="text-gray-500">Service Address</p>
