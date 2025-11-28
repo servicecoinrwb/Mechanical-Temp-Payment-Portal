@@ -309,6 +309,7 @@
                         const provider = new ethers.JsonRpcProvider(RPC_URL);
                         const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
                         const rev = await contract.totalRevenue();
+                        // Convert 6 decimal USDC to human readable
                         setOnChainRev("$" + ethers.formatUnits(rev, 6));
                     } catch(e) {
                         console.log("Error fetching contract revenue", e);
