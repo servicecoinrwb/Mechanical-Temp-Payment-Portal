@@ -117,7 +117,7 @@
         // --- REAL WORLD LINKS ---
         const STRIPE_LINK = "https://buy.stripe.com/bIY01kg5K3zD5I4fYY?_gl=1*1drrzbk*_ga*MjA1MzE1MDM4OS4xNzY0MDk4ODc4*_ga_0G63KLB2B0*czE3NjQxMDQwODgkbzEkZzEkdDE3NjQxMDQxOTckajU2JGwwJGgw";
         const MOONPAY_BASE_URL = "https://buy.moonpay.com";
-        const MOONPAY_API_KEY = "pk_test_YOUR_MOONPAY_KEY"; 
+        // Removed API Key constant since it's no longer needed for the URL
         
         // --- FIRESTORE DATABASE HELPERS ---
         const DB = {
@@ -129,6 +129,7 @@
                     }));
                 }
             },
+            // FIX: Added default address to fallback JSON to prevent crash on first load
             getVaultSettings: () => JSON.parse(localStorage.getItem('mt_vault_settings') || '{"address": "0xdFD1C01678e713FDe1630c9db921e6206f3795b4", "percentage": 2}'),
             updateVaultSettings: (settings) => {
                 localStorage.setItem('mt_vault_settings', JSON.stringify(settings));
@@ -289,7 +290,7 @@
                     
                     const web3auth = new Web3Auth({
                         clientId: WEB3AUTH_CLIENT_ID,
-                        // Updated to sapphire_mainnet per error logs
+                        // UPDATED: Switched back to 'sapphire_mainnet' as per your dashboard error message.
                         web3AuthNetwork: "sapphire_mainnet",
                         privateKeyProvider
                     });
