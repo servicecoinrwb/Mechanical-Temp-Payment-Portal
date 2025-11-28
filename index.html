@@ -102,7 +102,7 @@
         const LOGO_URL = "https://imageview.replit.app/objects/uploads/d16ab63e-1d1e-4b8f-863c-67e66e4894fc";
         const STRIPE_LINK = "https://buy.stripe.com/bIY01kg5K3zD5I4fYY?_gl=1*1drrzbk*_ga*MjA1MzE1MDM4OS4xNzY0MDk4ODc4*_ga_0G63KLB2B0*czE3NjQxMDQwODgkbzEkZzEkdDE3NjQxMDQxOTckajU2JGwwJGgw";
         const MOONPAY_BASE_URL = "https://buy.moonpay.com";
-
+        
         // --- HELPERS ---
         const DB = {
             init: async () => {
@@ -193,6 +193,7 @@
                     };
 
                     const privateKeyProvider = new EthereumPrivateKeyProvider({ config: { chainConfig } });
+                    
                     const web3auth = new Web3Auth({
                         clientId: WEB3AUTH_CLIENT_ID,
                         web3AuthNetwork: "sapphire_mainnet",
@@ -495,6 +496,14 @@
         const InvoiceDetail = ({ invoice, customer, onBack, onPaymentSuccess }) => {
             const [paymentMethod, setPaymentMethod] = useState('stripe');
             const [showManualWidget, setShowManualWidget] = useState(false);
+            
+            // GET BUSINESS WALLET (VAULT) ADDRESS
+            // Use DB helper if available or direct from localStorage to avoid async complexity in render
+            // Default fallback if empty
+            const savedSettings = localStorage.getItem('mt_vault_settings');
+            const vaultSettings = savedSettings ? JSON.parse(savedSettings) : { address: "0xdFD1C01678e713FDe1630c9db921e6206f3795b4" };
+            const businessAddress = vaultSettings.address || "0xdFD1C01678e713FDe1630c9db921e6206f3795b4"; 
+
             const items = invoice.items || [];
             const totalAmount = items.reduce((acc, item) => acc + (parseFloat(item.qty||0) * parseFloat(item.unitPrice||0)), 0);
             
@@ -511,9 +520,9 @@
                 if (paymentMethod === 'stripe') {
                     window.open(STRIPE_LINK, '_blank');
                 } else if (paymentMethod === 'moonpay') {
-                    const walletAddress = customer.walletAddress || "0x000000000000000000000000000000000000dead"; 
-                    const moonPayLink = `${MOONPAY_BASE_URL}?currencyCode=usdc_arbitrum&walletAddress=${walletAddress}`;
-                    if(confirm(`Opening MoonPay to buy USDC (Arbitrum).\n\nIMPORTANT: Ensure the destination address is set to YOUR wallet:\n\n${walletAddress}\n\nClick OK to proceed.`)) window.open(moonPayLink, '_blank');
+                    // Use Business Address for MoonPay Destination
+                    const moonPayLink = `${MOONPAY_BASE_URL}?currencyCode=usdc_arbitrum&walletAddress=${businessAddress}`;
+                    if(confirm(`Opening MoonPay to buy USDC (Arbitrum).\n\nIMPORTANT: Ensure the destination address is set to the BUSINESS wallet:\n\n${businessAddress}\n\nClick OK to proceed.`)) window.open(moonPayLink, '_blank');
                 } else {
                     setShowManualWidget(true);
                 }
@@ -539,7 +548,8 @@
                             <button onClick={handlePayment} className={`w-full text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 ${paymentMethod === 'stripe' ? 'bg-[#635BFF]' : paymentMethod === 'moonpay' ? 'bg-[#7D00FF]' : 'bg-sky-500'}`}>Pay Now</button>
                         </div>
                     </div>
-                    {showManualWidget && <ManualCryptoWidget address={customer.walletAddress || "Loading..."} amount={totalAmount} onClose={() => setShowManualWidget(false)} />}
+                    {/* Pass Business Address to Manual Widget */}
+                    {showManualWidget && <ManualCryptoWidget address={businessAddress} amount={totalAmount} onClose={() => setShowManualWidget(false)} />}
                 </div>
             );
         };
