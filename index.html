@@ -115,7 +115,7 @@
                     }));
                 }
             },
-            getVaultSettings: () => JSON.parse(localStorage.getItem('mt_vault_settings') || '{"address": "0xdFD1C01678e713FDe1630c9db921e6206f3795b4", "bankAddress": "", "percentage": 2}'),
+            getVaultSettings: () => JSON.parse(localStorage.getItem('mt_vault_settings') || '{"address": "0x441468A2de612CDec993f69407E481D30Ca5E203", "bankAddress": "", "percentage": 2}'),
             updateVaultSettings: (settings) => {
                 localStorage.setItem('mt_vault_settings', JSON.stringify(settings));
                 return settings;
@@ -539,8 +539,8 @@
             // Use DB helper if available or direct from localStorage to avoid async complexity in render
             // Default fallback if empty
             const savedSettings = localStorage.getItem('mt_vault_settings');
-            const vaultSettings = savedSettings ? JSON.parse(savedSettings) : { address: "0xdFD1C01678e713FDe1630c9db921e6206f3795b4" };
-            const businessAddress = vaultSettings.address || "0xdFD1C01678e713FDe1630c9db921e6206f3795b4"; 
+            const vaultSettings = savedSettings ? JSON.parse(savedSettings) : { address: "0x441468A2de612CDec993f69407E481D30Ca5E203" };
+            const businessAddress = vaultSettings.address || "0x441468A2de612CDec993f69407E481D30Ca5E203"; 
 
             const items = invoice.items || [];
             const totalAmount = items.reduce((acc, item) => acc + (parseFloat(item.qty||0) * parseFloat(item.unitPrice||0)), 0);
@@ -701,7 +701,7 @@
                     <main className="container mx-auto px-4 py-8">
                         {!user ? <LoginScreen onLogin={(u) => setUser(u)} /> : user.isAdmin ? <AdminDashboard user={user} customers={customers} invoices={invoices} onAddCustomer={DB.addCustomer} onDeleteCustomer={DB.deleteCustomer} onAddInvoice={DB.addInvoice} /> : <CustomerDashboard user={(customers || []).find(c => c.email === user.email || (user.walletAddress && c.walletAddress === user.walletAddress)) || user} invoices={invoices} onUpdateStatus={DB.updateInvoiceStatus} onSaveProfile={handleSaveProfile} />}
                     </main>
-                    <footer className="text-center text-sm text-gray-400 py-8 no-print"><p>&copy; 2024 Mechanical Temp LLC. Secure Payment Portal.</p></footer>
+                    <footer className="text-center text-sm text-gray-400 py-8 no-print"><p>&copy; 2025 Mechanical Temp LLC. Secure Payment Portal.</p></footer>
                 </div>
             );
         };
