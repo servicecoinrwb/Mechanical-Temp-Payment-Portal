@@ -703,7 +703,8 @@
                     const moonPayLink = `${MOONPAY_BASE_URL}?currencyCode=usdc_arbitrum&walletAddress=${businessAddress}`;
                     if(confirm(`Opening MoonPay to pay Mechanical Temp.\n\nDestination: Business Wallet\n${businessAddress.substring(0,10)}...\n\nClick OK to proceed.`)) window.open(moonPayLink, '_blank');
                 } else if (paymentMethod === 'contract') {
-                   handleContractPay();
+                   // Explicitly passing the contract address here as requested
+                   handleContractPay("0xE6b8EAb212c8E33c825e49E6C36F3030955E890d");
                 } else {
                     setShowManualWidget(true);
                 }
