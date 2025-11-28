@@ -134,21 +134,23 @@
         // --- COMPONENTS ---
 
         const Navbar = ({ user, onLogout }) => (
-            <nav className="w-full bg-white border-b border-gray-100 px-4 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm no-print">
+            <nav className="w-full bg-slate-900 border-b border-slate-800 px-4 py-4 flex justify-between items-center sticky top-0 z-50 shadow-md no-print text-white">
                 <div className="flex items-center gap-3">
-                    <img src={LOGO_URL} alt="Mechanical Temp Logo" className="h-10 w-auto object-contain" />
-                    <span className="font-bold text-gray-800 text-lg hidden sm:block">Mechanical Temp</span>
+                    <div className="bg-white p-1 rounded">
+                        <img src={LOGO_URL} alt="Mechanical Temp Logo" className="h-8 w-auto object-contain" />
+                    </div>
+                    <span className="font-bold text-lg hidden sm:block tracking-wide">Mechanical Temp</span>
                 </div>
                 {user && (
                     <div className="flex items-center gap-4">
                         <div className="hidden md:flex flex-col items-end">
-                            <span className="text-xs text-gray-500">{user.isAdmin ? 'Administrator' : 'Customer'}</span>
-                            <span className="text-sm font-medium text-gray-900">{user.email}</span>
+                            <span className="text-xs text-slate-400 uppercase tracking-wider">{user.isAdmin ? 'Administrator' : 'Customer'}</span>
+                            <span className="text-sm font-medium text-white">{user.email}</span>
                         </div>
-                        <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-white ${user.isAdmin ? 'bg-purple-600' : 'bg-blue-600'}`}>
+                        <div className={`h-9 w-9 rounded-full flex items-center justify-center font-bold text-white shadow-lg ${user.isAdmin ? 'bg-purple-600' : 'bg-sky-500'}`}>
                             {user.isAdmin ? 'A' : user.name ? user.name.charAt(0) : 'U'}
                         </div>
-                        <button onClick={onLogout} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Logout">
+                        <button onClick={onLogout} className="p-2 text-slate-400 hover:text-red-400 transition-colors" title="Logout">
                             <LogOut size={18} />
                         </button>
                     </div>
@@ -188,12 +190,12 @@
             return (
                 <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
                     <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                        <div className="bg-blue-600 p-8 text-center">
+                        <div className="bg-slate-900 p-8 text-center">
                             <div className="bg-white p-3 rounded-xl inline-block mx-auto mb-6 shadow-md">
                                 <img src={LOGO_URL} alt="Logo" className="h-12 w-auto" />
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-2">Portal Login</h2>
-                            <p className="text-blue-100">Mechanical Temp LLC</p>
+                            <p className="text-slate-300">Mechanical Temp LLC</p>
                         </div>
                         
                         <div className="p-8 space-y-6">
@@ -221,7 +223,7 @@
                                         required
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
                                         placeholder="Enter your email"
                                     />
                                 </div>
@@ -232,7 +234,7 @@
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
                                         placeholder="Enter password"
                                     />
                                 </div>
@@ -242,7 +244,7 @@
                                 <button
                                     type="submit"
                                     disabled={isLoading}
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-sm"
+                                    className="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-sky-200"
                                 >
                                     {isLoading ? <Loader2 className="animate-spin mx-auto" /> : "Sign In"}
                                 </button>
@@ -265,14 +267,14 @@
                         <div className="flex items-center gap-2 mb-4">
                             <button onClick={() => setView('dashboard')} className="hover:bg-gray-100 p-2 rounded-full"><ChevronLeft size={20} /></button>
                             <h2 className="text-2xl font-bold text-gray-900">Manage Customers</h2>
-                            <button onClick={() => setView('add-customer')} className="ml-auto bg-blue-600 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2">
+                            <button onClick={() => setView('add-customer')} className="ml-auto bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 shadow-sm">
                                 <Plus size={16} /> Add New
                             </button>
                         </div>
 
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-gray-50 text-gray-500">
+                                <thead className="bg-slate-50 text-slate-500">
                                     <tr>
                                         <th className="px-6 py-4 font-medium">Name</th>
                                         <th className="px-6 py-4 font-medium">Email</th>
@@ -285,11 +287,11 @@
                                     {customers.length === 0 ? (
                                         <tr><td colSpan="5" className="p-8 text-center text-gray-400">No customers found.</td></tr>
                                     ) : customers.map(c => (
-                                        <tr key={c.id} className="hover:bg-gray-50">
+                                        <tr key={c.id} className="hover:bg-slate-50">
                                             <td className="px-6 py-4 font-medium text-gray-900">{c.name}</td>
                                             <td className="px-6 py-4 text-gray-600">{c.email}</td>
                                             <td className="px-6 py-4 text-gray-500 truncate max-w-xs">{c.address}</td>
-                                            <td className="px-6 py-4 font-mono text-xs text-blue-600">{c.walletAddress ? c.walletAddress.substring(0,6)+'...'+c.walletAddress.substring(c.walletAddress.length-4) : '-'}</td>
+                                            <td className="px-6 py-4 font-mono text-xs text-sky-600">{c.walletAddress ? c.walletAddress.substring(0,6)+'...'+c.walletAddress.substring(c.walletAddress.length-4) : '-'}</td>
                                             <td className="px-6 py-4 text-right">
                                                 <button 
                                                     onClick={() => {
@@ -343,7 +345,7 @@
                                 <label className="block text-sm font-medium text-gray-700">Billing Address</label>
                                 <textarea required className="w-full p-2 border rounded" value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
                             </div>
-                            <button disabled={saving} className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold">
+                            <button disabled={saving} className="w-full bg-sky-500 hover:bg-sky-600 text-white py-2 rounded-lg font-bold">
                                 {saving ? "Saving..." : "Save Customer"}
                             </button>
                         </form>
@@ -407,10 +409,10 @@
                                         {items.length > 1 && <button type="button" onClick={() => removeItem(idx)} className="text-red-500 p-2"><Trash2 size={16}/></button>}
                                     </div>
                                 ))}
-                                <button type="button" onClick={addItem} className="text-sm text-blue-600 font-medium flex items-center gap-1 mt-2">+ Add Item</button>
+                                <button type="button" onClick={addItem} className="text-sm text-sky-600 font-medium flex items-center gap-1 mt-2">+ Add Item</button>
                             </div>
 
-                            <div className="bg-gray-50 p-4 rounded text-right">
+                            <div className="bg-slate-50 p-4 rounded text-right">
                                 <span className="text-gray-500 mr-2">Total:</span>
                                 <span className="font-bold text-xl">${items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0).toFixed(2)}</span>
                             </div>
@@ -445,19 +447,19 @@
                     </div>
 
                     <div className="flex gap-4">
-                        <button onClick={() => setView('add-invoice')} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition">
+                        <button onClick={() => setView('add-invoice')} className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm">
                             <FileText size={18} /> New Invoice
                         </button>
-                        <button onClick={() => setView('view-customers')} className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition">
+                        <button onClick={() => setView('view-customers')} className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition">
                             <Users size={18} /> Manage Customers
                         </button>
                     </div>
 
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 font-bold text-gray-700">All Invoices</div>
+                        <div className="px-6 py-4 border-b border-gray-200 bg-slate-50 font-bold text-gray-700">All Invoices</div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-gray-50 text-gray-500">
+                                <thead className="bg-slate-50 text-slate-500">
                                     <tr>
                                         <th className="px-6 py-3 font-medium">Invoice #</th>
                                         <th className="px-6 py-3 font-medium">Customer</th>
@@ -471,7 +473,7 @@
                                         const cust = customers.find(c => c.id === inv.customerId);
                                         const total = inv.items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0);
                                         return (
-                                            <tr key={inv.id} className="hover:bg-gray-50">
+                                            <tr key={inv.id} className="hover:bg-slate-50">
                                                 <td className="px-6 py-4 font-mono text-gray-600">{inv.id}</td>
                                                 <td className="px-6 py-4 font-medium">{cust ? cust.name : 'Unknown'}</td>
                                                 <td className="px-6 py-4 text-gray-500">{inv.date}</td>
@@ -507,7 +509,7 @@
                         </div>
                         <h2 className="text-3xl font-bold text-gray-900 mb-2">Invoice Paid</h2>
                         <p className="text-gray-500 mb-8">This invoice has been settled. Thank you for your business.</p>
-                        <button onClick={onBack} className="text-blue-600 hover:underline">Back to Invoices</button>
+                        <button onClick={onBack} className="text-sky-600 hover:underline">Back to Invoices</button>
                     </div>
                 );
             }
@@ -533,7 +535,7 @@
                                 <p className="text-gray-500 mt-1">{invoice.id}</p>
                             </div>
                             <div className="text-right">
-                                <button onClick={() => window.print()} className="no-print inline-flex items-center gap-2 text-sm text-blue-600 font-medium hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
+                                <button onClick={() => window.print()} className="no-print inline-flex items-center gap-2 text-sm text-sky-600 font-medium hover:text-sky-700 bg-sky-50 px-3 py-1.5 rounded-lg transition-colors">
                                     <Printer size={16} /> Print / PDF
                                 </button>
                                 <div className="mt-4">
@@ -558,7 +560,7 @@
                         </div>
 
                         <table className="w-full text-sm text-left mb-8">
-                            <thead className="bg-gray-50 text-gray-500 font-medium">
+                            <thead className="bg-slate-50 text-slate-500 font-medium">
                                 <tr>
                                     <th className="px-4 py-3">Description</th>
                                     <th className="px-4 py-3 text-center">Qty</th>
@@ -662,6 +664,7 @@
                 return true; 
             });
 
+            // Handle Saving Profile from Customer Dashboard
             const handleSave = async (e) => {
                 e.preventDefault();
                 await onSaveProfile(profileForm);
@@ -689,7 +692,7 @@
                         <div className="flex justify-between items-start mb-4">
                             <h2 className="text-xl font-bold text-gray-900">My Information</h2>
                             {!isEditing && (
-                                <button onClick={() => setIsEditing(true)} className="text-blue-600 text-sm font-medium hover:underline flex items-center gap-1">
+                                <button onClick={() => setIsEditing(true)} className="text-sky-600 text-sm font-medium hover:underline flex items-center gap-1">
                                     <Edit size={16} /> Edit Info
                                 </button>
                             )}
@@ -706,7 +709,7 @@
                                     <textarea className="w-full p-2 border rounded" value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} required placeholder="123 Example St" />
                                 </div>
                                 <div className="flex gap-2">
-                                    <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">Save Information</button>
+                                    <button type="submit" className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium">Save Information</button>
                                     <button type="button" onClick={() => setIsEditing(false)} className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">Cancel</button>
                                 </div>
                             </form>
@@ -727,7 +730,7 @@
                                 <div>
                                     <p className="text-gray-500">User ID (Wallet Address)</p>
                                     <div className="flex items-center gap-2 mt-1">
-                                        <p className="font-mono bg-gray-100 px-3 py-1.5 rounded-lg text-xs text-blue-700 break-all border border-gray-200">
+                                        <p className="font-mono bg-slate-100 px-3 py-1.5 rounded-lg text-xs text-sky-700 break-all border border-slate-200">
                                             {user.walletAddress || "Will generate after first save"}
                                         </p>
                                     </div>
@@ -745,7 +748,7 @@
                             ) : (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left">
-                                        <thead className="bg-gray-50 text-gray-500 text-sm">
+                                        <thead className="bg-slate-50 text-slate-500 text-sm">
                                             <tr>
                                                 <th className="px-6 py-4 font-medium">Invoice #</th>
                                                 <th className="px-6 py-4 font-medium">Date</th>
@@ -759,7 +762,7 @@
                                             {invoices.map(inv => {
                                                 const total = inv.items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0);
                                                 return (
-                                                    <tr key={inv.id} className="hover:bg-gray-50">
+                                                    <tr key={inv.id} className="hover:bg-slate-50">
                                                         <td className="px-6 py-4 font-mono text-gray-600">{inv.id}</td>
                                                         <td className="px-6 py-4 text-sm text-gray-600">{inv.date}</td>
                                                         <td className="px-6 py-4 text-sm text-gray-600">{inv.dueDate}</td>
@@ -770,7 +773,7 @@
                                                             </span>
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
-                                                            <button onClick={() => setSelectedInvoice(inv)} className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1">
+                                                            <button onClick={() => setSelectedInvoice(inv)} className="text-sky-600 hover:text-sky-800 font-medium text-sm flex items-center gap-1">
                                                                 View <ArrowRight size={14} />
                                                             </button>
                                                         </td>
@@ -851,12 +854,17 @@
 
             // Handle Saving Profile from Customer Dashboard
             const handleSaveProfile = async (data) => {
-                // Check if user exists in customers list
-                const existing = customers.find(c => c.email === user.email);
-                if (existing) {
-                    await DB.updateCustomer(existing.id, data);
+                // FIX: Query Firestore directly to avoid race conditions with local state
+                // This prevents creating duplicate users (and new wallet addresses) if the local list hasn't loaded yet
+                const q = query(collection(db, "customers"), where("email", "==", user.email));
+                const querySnapshot = await getDocs(q);
+
+                if (!querySnapshot.empty) {
+                    // User exists - Update the existing record
+                    const docId = querySnapshot.docs[0].id;
+                    await DB.updateCustomer(docId, data);
                 } else {
-                    // Create new customer record with current auth email
+                    // Really is a new user - Create record
                     await DB.addCustomer({ ...data, email: user.email });
                 }
             };
