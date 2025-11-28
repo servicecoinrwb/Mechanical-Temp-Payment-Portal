@@ -105,7 +105,7 @@
         const MOONPAY_BASE_URL = "https://buy.moonpay.com";
         
         // --- SMART CONTRACT CONFIG ---
-        const CONTRACT_ADDRESS = "0xE6b8EAb212c8E33c825e49E6C36F3030955E890d"; // Updated
+        const CONTRACT_ADDRESS = "0xE6b8EAb212c8E33c825e49E6C36F3030955E890d"; 
         const CONTRACT_ABI = [{"inputs":[{"internalType":"address","name":"_usdcTokenAddress","type":"address"}],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"FundsWithdrawn","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"string","name":"invoiceId","type":"string"},{"indexed":true,"internalType":"address","name":"customer","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"InvoicePaid","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":false,"internalType":"address","name":"oldToken","type":"address"},{"indexed":false,"internalType":"address","name":"newToken","type":"address"}],"name":"TokenUpdated","type":"event"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"string","name":"_invoiceId","type":"string"},{"internalType":"uint256","name":"_amount","type":"uint256"}],"name":"payInvoice","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"_newToken","type":"address"}],"name":"setUsdcToken","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"totalRevenue","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"usdcToken","outputs":[{"internalType":"contract IERC20","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"withdrawFunds","outputs":[],"stateMutability":"nonpayable","type":"function"}];
         
         const ERC20_ABI = [
@@ -128,7 +128,6 @@
                     }));
                 }
             },
-            // UPDATED: Fix to merge stored settings with defaults to ensure bankAddress exists
             getVaultSettings: () => {
                 const defaults = {
                     address: "0xdFD1C01678e713FDe1630c9db921e6206f3795b4",
@@ -284,8 +283,8 @@
                 <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
                     <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
                         <div className="bg-slate-900 p-8 text-center">
-                            <div className="bg-white px-6 py-4 rounded-2xl inline-block mx-auto mb-6 shadow-lg">
-                                <img src={LOGO_URL} alt="Logo" className="h-16 w-auto object-contain" />
+                            <div className="bg-white p-3 rounded-xl inline-block mx-auto mb-6 shadow-md">
+                                <img src={LOGO_URL} alt="Logo" className="h-12 w-auto" />
                             </div>
                             <h2 className="text-2xl font-bold text-white mb-2">Portal Login</h2>
                             <p className="text-slate-300">Mechanical Temp LLC</p>
@@ -627,11 +626,9 @@
             const [isMining, setIsMining] = useState(false); // Track mining status
             
             // GET BUSINESS WALLET WALLET
-            // UPDATED: Prioritize 'bankAddress' (Revenue) over 'address' (Vault/Profit)
             const savedSettings = localStorage.getItem('mt_vault_settings');
             const vaultSettings = savedSettings ? JSON.parse(savedSettings) : {};
-            
-            // If bankAddress is set, use it. Otherwise fallback to vault address.
+            // Default to Bank Address if set, otherwise fallback to Vault address
             const businessAddress = vaultSettings.bankAddress || vaultSettings.address || "0xdFD1C01678e713FDe1630c9db921e6206f3795b4"; 
 
             const items = invoice.items || [];
@@ -642,7 +639,7 @@
                     <div className="max-w-xl mx-auto text-center py-12">
                         <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600"><CheckCircle2 size={48} /></div>
                         <h2 className="text-3xl font-bold text-gray-900 mb-2">Invoice Paid</h2>
-                        <p className="text-gray-500 mb-8">Transaction recorded.</p>
+                        <p className="text-gray-500 mb-8">Transaction recorded on Blockchain.</p>
                         <button onClick={onBack} className="text-sky-600 hover:underline">Back to Invoices</button>
                     </div>
                 );
@@ -670,19 +667,19 @@
                     const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, signer);
                     
                     // 3. Approve USDC
-                    // Amount in 6 decimals (USDC)
+                    // Amount in 6 decimals (USDC has 6 decimals)
                     const amount6 = ethers.parseUnits(totalAmount.toString(), 6);
                     
                     // Check allowance
                     const allowance = await usdc.allowance(userAddr, CONTRACT_ADDRESS);
                     if(allowance < amount6) {
-                         alert("Step 1/2: Please approve USDC spending.");
+                         alert("Step 1/2: Please approve USDC spending in your wallet.");
                          const txApprove = await usdc.approve(CONTRACT_ADDRESS, amount6);
                          await txApprove.wait();
                     }
 
                     // 4. Pay Invoice
-                    alert("Step 2/2: Confirm Payment.");
+                    alert("Step 2/2: Confirm Payment Transaction.");
                     const tx = await contract.payInvoice(invoice.id, amount6);
                     
                     alert(`Transaction Sent! Hash: ${tx.hash}`);
