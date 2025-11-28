@@ -96,6 +96,7 @@
         const ChevronLeft = (p) => <IconWrapper {...p}><path d="m15 18-6-6 6-6"/></IconWrapper>;
         const Wallet = (p) => <IconWrapper {...p}><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" /><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" /></IconWrapper>;
         const ExternalLink = (p) => <IconWrapper {...p}><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" x2="21" y1="14" y2="3" /></IconWrapper>;
+        const Edit = (p) => <IconWrapper {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></IconWrapper>;
 
 
         // --- CONFIG & CONSTANTS ---
@@ -113,6 +114,9 @@
                     customer.walletAddress = "0x" + Math.floor(Math.random()*16777215).toString(16);
                 }
                 return await addDoc(collection(db, "customers"), customer);
+            },
+            updateCustomer: async (id, data) => {
+                await updateDoc(doc(db, "customers", id), data);
             },
             deleteCustomer: async (id) => {
                 // Delete the document from Firestore
@@ -638,12 +642,31 @@
             );
         };
 
-        const CustomerDashboard = ({ user, invoices, onUpdateStatus }) => {
+        const CustomerDashboard = ({ user, invoices, onUpdateStatus, onSaveProfile }) => { // Added onSaveProfile
             const [selectedInvoice, setSelectedInvoice] = useState(null);
+            const [isEditing, setIsEditing] = useState(false);
+            const [profileForm, setProfileForm] = useState({
+                name: user.name || "",
+                address: user.address || ""
+            });
+
+            // Update form when user prop updates (e.g. after save)
+            useEffect(() => {
+                setProfileForm({
+                    name: user.name || "",
+                    address: user.address || ""
+                });
+            }, [user]);
             
             const myInvoices = invoices.filter(i => {
                 return true; 
             });
+
+            const handleSave = async (e) => {
+                e.preventDefault();
+                await onSaveProfile(profileForm);
+                setIsEditing(false);
+            };
 
             if (selectedInvoice) {
                 return (
@@ -660,50 +683,105 @@
             }
 
             return (
-                <div className="max-w-4xl mx-auto">
-                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Invoices</h2>
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                        {invoices.length === 0 ? (
-                            <div className="p-8 text-center text-gray-500">No invoices found.</div>
+                <div className="max-w-4xl mx-auto space-y-8">
+                    {/* Profile Section */}
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                        <div className="flex justify-between items-start mb-4">
+                            <h2 className="text-xl font-bold text-gray-900">My Information</h2>
+                            {!isEditing && (
+                                <button onClick={() => setIsEditing(true)} className="text-blue-600 text-sm font-medium hover:underline flex items-center gap-1">
+                                    <Edit size={16} /> Edit Info
+                                </button>
+                            )}
+                        </div>
+
+                        {isEditing ? (
+                            <form onSubmit={handleSave} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Name</label>
+                                    <input className="w-full p-2 border rounded" value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} required placeholder="Your full name" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Service Address</label>
+                                    <textarea className="w-full p-2 border rounded" value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} required placeholder="123 Example St" />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium">Save Information</button>
+                                    <button type="button" onClick={() => setIsEditing(false)} className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">Cancel</button>
+                                </div>
+                            </form>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-gray-50 text-gray-500 text-sm">
-                                        <tr>
-                                            <th className="px-6 py-4 font-medium">Invoice #</th>
-                                            <th className="px-6 py-4 font-medium">Date</th>
-                                            <th className="px-6 py-4 font-medium">Due</th>
-                                            <th className="px-6 py-4 font-medium">Total</th>
-                                            <th className="px-6 py-4 font-medium">Status</th>
-                                            <th className="px-6 py-4"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {invoices.map(inv => {
-                                            const total = inv.items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0);
-                                            return (
-                                                <tr key={inv.id} className="hover:bg-gray-50">
-                                                    <td className="px-6 py-4 font-mono text-gray-600">{inv.id}</td>
-                                                    <td className="px-6 py-4 text-sm text-gray-600">{inv.date}</td>
-                                                    <td className="px-6 py-4 text-sm text-gray-600">{inv.dueDate}</td>
-                                                    <td className="px-6 py-4 font-medium text-gray-900">${total.toFixed(2)}</td>
-                                                    <td className="px-6 py-4">
-                                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${inv.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                                            {inv.status}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right">
-                                                        <button onClick={() => setSelectedInvoice(inv)} className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1">
-                                                            View <ArrowRight size={14} />
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                            <div className="grid md:grid-cols-2 gap-4 text-sm">
+                                <div>
+                                    <p className="text-gray-500">Customer Name</p>
+                                    <p className="font-medium text-lg">{user.name || "N/A"}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">Email</p>
+                                    <p className="font-medium">{user.email}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">Service Address</p>
+                                    <p className="font-medium">{user.address || "N/A"}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">User ID (Wallet Address)</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <p className="font-mono bg-gray-100 px-3 py-1.5 rounded-lg text-xs text-blue-700 break-all border border-gray-200">
+                                            {user.walletAddress || "Will generate after first save"}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         )}
+                    </div>
+
+                    {/* Invoices Section */}
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Invoices</h2>
+                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                            {invoices.length === 0 ? (
+                                <div className="p-8 text-center text-gray-500">No invoices found.</div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-gray-50 text-gray-500 text-sm">
+                                            <tr>
+                                                <th className="px-6 py-4 font-medium">Invoice #</th>
+                                                <th className="px-6 py-4 font-medium">Date</th>
+                                                <th className="px-6 py-4 font-medium">Due</th>
+                                                <th className="px-6 py-4 font-medium">Total</th>
+                                                <th className="px-6 py-4 font-medium">Status</th>
+                                                <th className="px-6 py-4"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {invoices.map(inv => {
+                                                const total = inv.items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0);
+                                                return (
+                                                    <tr key={inv.id} className="hover:bg-gray-50">
+                                                        <td className="px-6 py-4 font-mono text-gray-600">{inv.id}</td>
+                                                        <td className="px-6 py-4 text-sm text-gray-600">{inv.date}</td>
+                                                        <td className="px-6 py-4 text-sm text-gray-600">{inv.dueDate}</td>
+                                                        <td className="px-6 py-4 font-medium text-gray-900">${total.toFixed(2)}</td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${inv.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                                {inv.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <button onClick={() => setSelectedInvoice(inv)} className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1">
+                                                                View <ArrowRight size={14} />
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             );
@@ -771,6 +849,18 @@
                 };
             }, [user, customers.length]); 
 
+            // Handle Saving Profile from Customer Dashboard
+            const handleSaveProfile = async (data) => {
+                // Check if user exists in customers list
+                const existing = customers.find(c => c.email === user.email);
+                if (existing) {
+                    await DB.updateCustomer(existing.id, data);
+                } else {
+                    // Create new customer record with current auth email
+                    await DB.addCustomer({ ...data, email: user.email });
+                }
+            };
+
             return (
                 <div className="min-h-screen pb-12">
                     <Navbar user={user} onLogout={() => signOut(auth)} />
@@ -791,6 +881,7 @@
                                 user={customers.find(c => c.email === user.email) || user} 
                                 invoices={invoices}
                                 onUpdateStatus={DB.updateInvoiceStatus}
+                                onSaveProfile={handleSaveProfile}
                             />
                         )}
                     </main>
