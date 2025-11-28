@@ -14,6 +14,13 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Ethers.js (v6 - Updated to match Partner Portal) -->
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.11.1/dist/ethers.umd.min.js"></script>
+
+    <!-- Web3Auth (Updated to v9.4.4) -->
+    <script src="https://cdn.jsdelivr.net/npm/@web3auth/modal@9.4.4/dist/modal.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@web3auth/ethereum-provider@9.4.4/dist/ethereumProvider.umd.min.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -35,15 +42,6 @@
     <!-- MAIN SCRIPT: data-type="module" is required for Firebase Imports -->
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-analytics.js";
-        import { 
-            getAuth, 
-            signInWithPopup, 
-            GoogleAuthProvider, 
-            signInWithEmailAndPassword, 
-            signOut, 
-            onAuthStateChanged 
-        } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { 
             getFirestore, 
             collection, 
@@ -57,7 +55,7 @@
             where 
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-        // --- FIREBASE CONFIGURATION ---
+        // --- FIREBASE CONFIGURATION (Only for Database now) ---
         const firebaseConfig = {
             apiKey: "AIzaSyC8YsDjof0BjtQOZ4Clx7pCSSXNCa7DQp0",
             authDomain: "payment-portal-479614.firebaseapp.com",
@@ -70,10 +68,12 @@
 
         // Initialize Firebase
         const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
-        const auth = getAuth(app);
         const db = getFirestore(app);
-        const googleProvider = new GoogleAuthProvider();
+
+        // --- WEB3AUTH CONFIGURATION ---
+        const WEB3AUTH_CLIENT_ID = "BOp1I844CnOw4gAPJXft8hk0r1z8OiwiquU9-qOtY3xedheGn13tykbaJa6xty2dGtOpCE2vnOZsFxYwKhM8w58"; 
+        const CHAIN_ID = "0xa4b1"; // Arbitrum One
+        const RPC_URL = "https://arb1.arbitrum.io/rpc";
 
         const { useState, useEffect, useMemo } = React;
 
@@ -119,13 +119,13 @@
                     }));
                 }
             },
-            // FIX: Added default address to fallback JSON to prevent crash on first load
             getVaultSettings: () => JSON.parse(localStorage.getItem('mt_vault_settings') || '{"address": "0xdFD1C01678e713FDe1630c9db921e6206f3795b4", "percentage": 2}'),
             updateVaultSettings: (settings) => {
                 localStorage.setItem('mt_vault_settings', JSON.stringify(settings));
                 return settings;
             },
             addCustomer: async (customer) => {
+                // If using Web3Auth, walletAddress might already be present
                 if(!customer.walletAddress) {
                     customer.walletAddress = "0x" + Math.floor(Math.random()*16777215).toString(16);
                 }
@@ -173,85 +173,97 @@
             </nav>
         );
 
-        const LoginScreen = ({ onWalletLogin }) => {
-            const [email, setEmail] = useState("");
-            const [password, setPassword] = useState("");
+        const LoginScreen = ({ onLogin }) => {
             const [isLoading, setIsLoading] = useState(false);
             const [error, setError] = useState("");
 
-            const handleGoogleLogin = async () => {
+            // --- WEB3AUTH INIT & LOGIN ---
+            const login = async () => {
                 setIsLoading(true);
                 setError("");
                 try {
-                    await signInWithPopup(auth, googleProvider);
-                } catch (err) {
-                    setError(err.message);
-                    setIsLoading(false);
-                }
-            };
+                    const { Web3Auth } = window.Modal;
+                    const { EthereumPrivateKeyProvider } = window.EthereumProvider;
 
-            const handleEmailLogin = async (e) => {
-                e.preventDefault();
-                setIsLoading(true);
-                setError("");
-                try {
-                    await signInWithEmailAndPassword(auth, email, password);
-                } catch (err) {
-                    setError("Login failed. Please check credentials or sign up first.");
-                    setIsLoading(false);
-                }
-            };
+                    const chainConfig = {
+                        chainNamespace: "eip155",
+                        chainId: CHAIN_ID, 
+                        rpcTarget: RPC_URL,
+                        displayName: "Arbitrum One",
+                        blockExplorerUrl: "https://arbiscan.io",
+                        ticker: "ETH",
+                        tickerName: "Ethereum",
+                    };
 
-            // --- CRYPTO NATIVE LOGIN LOGIC ---
-            const handleWalletConnect = async () => {
-                if (!window.ethereum) {
-                    alert("No crypto wallet found! Please install Metamask, Rabby, or Coinbase Wallet.");
-                    return;
-                }
-                
-                setIsLoading(true);
-                setError("");
+                    const privateKeyProvider = new EthereumPrivateKeyProvider({ config: { chainConfig } });
+                    
+                    const web3auth = new Web3Auth({
+                        clientId: WEB3AUTH_CLIENT_ID,
+                        web3AuthNetwork: "sapphire_mainnet",
+                        privateKeyProvider
+                    });
 
-                try {
-                    // 1. Request Wallet Connection
-                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-                    const address = accounts[0];
+                    await web3auth.initModal();
+                    
+                    // Connect (Modal opens here)
+                    const provider = await web3auth.connect();
+                    
+                    // Get User Info
+                    const userInfo = await web3auth.getUserInfo();
+                    
+                    // Get Wallet Address (Ethers v6)
+                    const ethersProvider = new ethers.BrowserProvider(provider);
+                    const signer = await ethersProvider.getSigner();
+                    const address = await signer.getAddress();
 
-                    // 2. Query DB to see if this address belongs to a customer
-                    const q = query(collection(db, "customers"), where("walletAddress", "==", address));
+                    // --- IDENTITY CHECK ---
+                    // Check if Admin
+                    if (userInfo.email === "admin@mechanicaltemp.com") {
+                        onLogin({ email: userInfo.email, isAdmin: true, name: "Admin", web3authInstance: web3auth });
+                        return;
+                    }
+
+                    // Check Firestore for Customer
+                    // We check if either the Email OR the Wallet Address matches a record
+                    let q;
+                    if(userInfo.email) {
+                        q = query(collection(db, "customers"), where("email", "==", userInfo.email));
+                    } else {
+                        q = query(collection(db, "customers"), where("walletAddress", "==", address));
+                    }
+                    
                     const querySnapshot = await getDocs(q);
-
+                    
                     let userData;
-
                     if (!querySnapshot.empty) {
                         // Returning User
                         const docData = querySnapshot.docs[0].data();
                         userData = {
-                            uid: address, // Use wallet as ID for session
-                            email: docData.email || "", // Might be empty if pure crypto user
-                            name: docData.name || "Wallet User",
-                            walletAddress: address,
+                            id: querySnapshot.docs[0].id,
+                            email: userInfo.email || docData.email,
+                            name: docData.name || userInfo.name || "User",
+                            walletAddress: address, // Ensure we use the real address
                             isAdmin: false,
-                            address: docData.address || ""
+                            address: docData.address || "",
+                            web3authInstance: web3auth
                         };
                     } else {
-                        // New User (Guest/Wallet-Only Mode)
+                        // New User
                         userData = {
-                            uid: address,
-                            email: "", // No email yet
-                            name: "Wallet Guest",
+                            email: userInfo.email || "",
+                            name: userInfo.name || "Guest",
                             walletAddress: address,
                             isAdmin: false,
-                            isNew: true // Flag to prompt for profile info
+                            isNew: true,
+                            web3authInstance: web3auth
                         };
                     }
-
-                    // 3. Trigger Login in App
-                    onWalletLogin(userData);
+                    
+                    onLogin(userData);
 
                 } catch (err) {
-                    console.error(err);
-                    setError("Wallet connection rejected or failed.");
+                    console.error("Web3Auth Login Error:", err);
+                    setError("Login cancelled or failed.");
                     setIsLoading(false);
                 }
             };
@@ -267,67 +279,25 @@
                             <p className="text-slate-300">Mechanical Temp LLC</p>
                         </div>
                         
-                        <div className="p-8 space-y-4">
-                            {/* Google Login */}
-                            <button
-                                onClick={handleGoogleLogin}
-                                disabled={isLoading}
-                                className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-bold py-3 px-4 rounded-xl transition-all shadow-sm"
-                            >
-                                <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5"/>
-                                {isLoading ? "Connecting..." : "Sign in with Google"}
-                            </button>
-
-                            {/* WALLET CONNECT BUTTON */}
-                            <button
-                                onClick={handleWalletConnect}
-                                disabled={isLoading}
-                                className="w-full flex items-center justify-center gap-2 bg-orange-50 border border-orange-200 hover:bg-orange-100 text-orange-800 font-bold py-3 px-4 rounded-xl transition-all shadow-sm"
-                            >
-                                <Wallet size={20} />
-                                {isLoading ? "Connecting..." : "Connect Wallet (Rabby/MetaMask)"}
-                            </button>
-
-                            <div className="relative flex py-2 items-center">
-                                <div className="flex-grow border-t border-gray-200"></div>
-                                <span className="flex-shrink-0 mx-4 text-gray-400 text-xs">OR EMAIL</span>
-                                <div className="flex-grow border-t border-gray-200"></div>
+                        <div className="p-8 space-y-6">
+                            <div className="text-center mb-6">
+                                <p className="text-sm text-gray-500">Sign in securely with Google, Email, or your External Wallet (Metamask/Rabby).</p>
                             </div>
 
-                            <form onSubmit={handleEmailLogin} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-                                    <input 
-                                        type="email" 
-                                        required
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
-                                        placeholder="Enter your email"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
-                                    <input 
-                                        type="password" 
-                                        required
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-sky-500 outline-none"
-                                        placeholder="Enter password"
-                                    />
-                                </div>
-                                
-                                {error && <p className="text-red-500 text-sm">{error}</p>}
+                            <button
+                                onClick={login}
+                                disabled={isLoading}
+                                className="w-full flex items-center justify-center gap-3 bg-sky-500 hover:bg-sky-600 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-sky-200 transform hover:scale-[1.02]"
+                            >
+                                {isLoading ? <Loader2 className="animate-spin" /> : <Wallet size={20} />}
+                                <span>Login / Connect Wallet</span>
+                            </button>
 
-                                <button
-                                    type="submit"
-                                    disabled={isLoading}
-                                    className="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg shadow-sky-200"
-                                >
-                                    {isLoading ? <Loader2 className="animate-spin mx-auto" /> : "Sign In"}
-                                </button>
-                            </form>
+                            <div className="text-center text-xs text-gray-400 mt-4 flex items-center justify-center gap-2">
+                                <Lock size={12} />
+                                <span>Powered by Web3Auth & Arbitrum</span>
+                            </div>
+                            {error && <p className="text-red-500 text-sm text-center mt-2">{error}</p>}
                         </div>
                     </div>
                 </div>
@@ -726,7 +696,11 @@
                     window.open(STRIPE_LINK, '_blank');
                 } else if (paymentMethod === 'moonpay') {
                     const walletAddress = customer.walletAddress || "0x000000000000000000000000000000000000dead"; 
-                    const moonPayLink = `${MOONPAY_BASE_URL}?apiKey=${MOONPAY_API_KEY}&walletAddress=${walletAddress}&currencyCode=usdc_arbitrum&baseCurrencyAmount=${totalAmount}&baseCurrencyCode=usd`;
+                    
+                    // FIXED: Removed invalid API Key and Amount parameters to match your working snippet.
+                    // This uses the simple default MoonPay flow.
+                    const moonPayLink = `${MOONPAY_BASE_URL}?currencyCode=usdc_arbitrum&walletAddress=${walletAddress}`;
+                    
                     const confirmMsg = `Opening MoonPay to buy USDC (Arbitrum).\n\nIMPORTANT: Ensure the destination address is set to YOUR wallet:\n\n${walletAddress}\n\nClick OK to proceed.`;
                     if(confirm(confirmMsg)) {
                         window.open(moonPayLink, '_blank');
@@ -1043,31 +1017,7 @@
             const [customers, setCustomers] = useState([]);
             const [invoices, setInvoices] = useState([]);
 
-            // 1. Listen for Auth Changes
-            useEffect(() => {
-                const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-                    if (currentUser) {
-                        // Check if admin
-                        const isAdmin = currentUser.email === "admin@mechanicaltemp.com"; // Simple admin check
-                        
-                        setUser({
-                            uid: currentUser.uid,
-                            email: currentUser.email,
-                            name: currentUser.displayName,
-                            isAdmin: isAdmin
-                        });
-                    } else {
-                        // DO NOT reset user here immediately if it might be a wallet user
-                        // We handle wallet users via onWalletLogin which sets user manually
-                        // But if onAuthStateChanged fires null (e.g. logout), we should clear
-                        // Only clear if the current user state is NOT a wallet user (has no email, or is specific type)
-                        // Actually simpler: let logout button clear state
-                    }
-                });
-                return () => unsubscribe();
-            }, []);
-
-            // 2. Listen for Database Changes (Real-Time Sync)
+            // 1. Listen for Database Changes (Real-Time Sync)
             useEffect(() => {
                 if (!user) return;
 
@@ -1086,7 +1036,7 @@
                     if (user.isAdmin) {
                         setInvoices(list);
                     } else {
-                        const myCustomerRecord = customers.find(c => c.email === user.email || c.walletAddress === user.walletAddress);
+                        const myCustomerRecord = customers.find(c => c.email === user.email || (user.walletAddress && c.walletAddress === user.walletAddress));
                         if (myCustomerRecord) {
                              setInvoices(list.filter(inv => inv.customerId === myCustomerRecord.id));
                         } else {
@@ -1130,7 +1080,9 @@
             };
 
             const handleLogout = async () => {
-                await signOut(auth);
+                if(user.web3authInstance) {
+                    await user.web3authInstance.logout();
+                }
                 setUser(null);
                 setCustomers([]);
                 setInvoices([]);
@@ -1142,7 +1094,7 @@
                     
                     <main className="container mx-auto px-4 py-8">
                         {!user ? (
-                            <LoginScreen onWalletLogin={(u) => setUser(u)} />
+                            <LoginScreen onLogin={(u) => setUser(u)} />
                         ) : user.isAdmin ? (
                             <AdminDashboard 
                                 customers={customers} 
