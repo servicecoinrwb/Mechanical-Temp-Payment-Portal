@@ -42,7 +42,6 @@
     <!-- MAIN SCRIPT: data-type="module" is required for Firebase Imports -->
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-        // REMOVED: firebase-auth imports
         import { 
             getFirestore, 
             collection, 
@@ -51,7 +50,7 @@
             updateDoc, 
             deleteDoc, 
             doc, 
-            onSnapshot,
+            onSnapshot, 
             query, 
             where 
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -67,7 +66,7 @@
             measurementId: "G-0W6T5ZYR7Q"
         };
 
-        // Initialize Firebase (DB Only)
+        // Initialize Firebase (DB Only - No Auth)
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
@@ -126,7 +125,6 @@
             },
             addCustomer: async (customer) => {
                 if(!customer.walletAddress) {
-                    // Create real random wallet if none exists
                     try {
                         const randomWallet = ethers.Wallet.createRandom();
                         customer.walletAddress = randomWallet.address;
@@ -182,7 +180,7 @@
             const [isLoading, setIsLoading] = useState(false);
             const [error, setError] = useState("");
 
-            // --- WEB3AUTH LOGIN (GOOGLE + WALLETS) ---
+            // --- WEB3AUTH INIT & LOGIN ---
             const login = async () => {
                 setIsLoading(true);
                 setError("");
@@ -203,34 +201,27 @@
                     const privateKeyProvider = new EthereumPrivateKeyProvider({ config: { chainConfig } });
                     
                     const web3auth = new Web3Auth({
-                        clientId: "BHF9CqnAVImFVStW0OXLuKvgef28VqIAZ8jyngsS-HSuAiuAsgIra04uPbO7-VZpccAdNt56DAWCDaZDbWP6PEA",
-                        // Mainnet as requested
+                        clientId: WEB3AUTH_CLIENT_ID,
                         web3AuthNetwork: "sapphire_mainnet",
                         privateKeyProvider
                     });
 
                     await web3auth.initModal();
                     
-                    // Connect (Modal opens here)
                     const provider = await web3auth.connect();
-                    
-                    // Get User Info
                     const userInfo = await web3auth.getUserInfo();
                     
-                    // Get Wallet Address (Ethers v6)
                     const ethersProvider = new ethers.BrowserProvider(provider);
                     const signer = await ethersProvider.getSigner();
                     const address = await signer.getAddress();
 
                     // --- IDENTITY CHECK ---
-                    // Check if Admin
                     if (userInfo.email === "admin@mechanicaltemp.com") {
                         onLogin({ email: userInfo.email, isAdmin: true, name: "Admin", web3authInstance: web3auth });
                         return;
                     }
 
                     // Check Firestore for Customer
-                    // We check if either the Email OR the Wallet Address matches a record
                     let q;
                     if(userInfo.email) {
                         q = query(collection(db, "customers"), where("email", "==", userInfo.email));
@@ -242,7 +233,6 @@
                     
                     let userData;
                     if (!querySnapshot.empty) {
-                        // Returning User
                         const docData = querySnapshot.docs[0].data();
                         userData = {
                             id: querySnapshot.docs[0].id,
@@ -254,7 +244,6 @@
                             web3authInstance: web3auth
                         };
                     } else {
-                        // New User
                         userData = {
                             email: userInfo.email || "",
                             name: userInfo.name || "Guest",
@@ -287,7 +276,7 @@
                         
                         <div className="p-8 space-y-6">
                             <div className="text-center mb-6">
-                                <p className="text-sm text-gray-500">Access your invoices securely using your Google Account, Email, or Wallet.</p>
+                                <p className="text-sm text-gray-500">Sign in securely with Google, Email, or your External Wallet (Metamask/Rabby).</p>
                             </div>
 
                             <button
@@ -320,6 +309,7 @@
                 DB.init();
             }, []);
 
+            // --- 1. Customer List View (View & Delete) ---
             const CustomerList = () => {
                 return (
                     <div className="space-y-6 animate-in fade-in">
@@ -330,6 +320,7 @@
                                 <Plus size={16} /> Add New
                             </button>
                         </div>
+
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-slate-50 text-slate-500">
@@ -351,7 +342,15 @@
                                             <td className="px-6 py-4 text-gray-500 truncate max-w-xs">{c.address}</td>
                                             <td className="px-6 py-4 font-mono text-xs text-sky-600">{c.walletAddress ? c.walletAddress.substring(0,6)+'...'+c.walletAddress.substring(c.walletAddress.length-4) : '-'}</td>
                                             <td className="px-6 py-4 text-right">
-                                                <button onClick={() => { if(confirm(`Delete ${c.name}?`)) onDeleteCustomer(c.id); }} className="text-gray-400 hover:text-red-600 p-2">
+                                                <button 
+                                                    onClick={() => {
+                                                        if(confirm(`Are you sure you want to delete ${c.name}? This cannot be undone.`)) {
+                                                            onDeleteCustomer(c.id);
+                                                        }
+                                                    }}
+                                                    className="text-gray-400 hover:text-red-600 p-2 transition-colors" 
+                                                    title="Delete Customer"
+                                                >
                                                     <Trash2 size={18} />
                                                 </button>
                                             </td>
@@ -364,9 +363,11 @@
                 );
             };
 
+            // --- 2. Add Customer Form ---
             const AddCustomerForm = () => {
                 const [form, setForm] = useState({ name: "", email: "", address: "" });
                 const [saving, setSaving] = useState(false);
+
                 const handleSubmit = async (e) => {
                     e.preventDefault();
                     setSaving(true);
@@ -381,29 +382,44 @@
                             <h3>Add New Customer</h3>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <input required className="w-full p-2 border rounded" placeholder="Name" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-                            <input required type="email" className="w-full p-2 border rounded" placeholder="Email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
-                            <textarea required className="w-full p-2 border rounded" placeholder="Address" value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
-                            <button disabled={saving} className="w-full bg-sky-500 hover:bg-sky-600 text-white py-2 rounded-lg font-bold">{saving ? "Saving..." : "Save Customer"}</button>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Customer Name</label>
+                                <input required className="w-full p-2 border rounded" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Email</label>
+                                <input required type="email" className="w-full p-2 border rounded" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Billing Address</label>
+                                <textarea required className="w-full p-2 border rounded" value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
+                            </div>
+                            <button disabled={saving} className="w-full bg-sky-500 hover:bg-sky-600 text-white py-2 rounded-lg font-bold">
+                                {saving ? "Saving..." : "Save Customer"}
+                            </button>
                         </form>
                     </div>
                 );
             };
 
             const AddInvoiceForm = () => {
-                const [customerId, setCustomerId] = useState("");
+                const [customerId, setCustomerId] = useState(customers[0]?.id || "");
                 const [items, setItems] = useState([{ desc: "", qty: 1, unitPrice: 0 }]);
                 const [saving, setSaving] = useState(false);
+
                 const addItem = () => setItems([...items, { desc: "", qty: 1, unitPrice: 0 }]);
                 const updateItem = (idx, field, val) => {
                     const newItems = [...items];
                     newItems[idx][field] = val;
                     setItems(newItems);
                 };
+                const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
+
                 const handleSubmit = async (e) => {
                     e.preventDefault();
                     if(!customerId) return alert("Select a customer");
                     setSaving(true);
+                    
                     const newInvoice = {
                         id: `INV-${Date.now().toString().slice(-6)}`,
                         customerId: customerId,
@@ -416,6 +432,7 @@
                     setSaving(false);
                     setView('dashboard');
                 };
+
                 return (
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4">
                          <div className="flex items-center gap-2 mb-6 text-gray-900 font-bold text-xl">
@@ -423,44 +440,85 @@
                             <h3>Create Invoice</h3>
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            <select className="w-full p-2 border rounded" value={customerId} onChange={e => setCustomerId(e.target.value)}>
-                                <option value="">Select a Customer</option>
-                                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            </select>
-                            {items.map((item, idx) => (
-                                <div key={idx} className="flex gap-2 mb-2">
-                                    <input placeholder="Description" className="flex-1 p-2 border rounded" value={item.desc} onChange={e => updateItem(idx, 'desc', e.target.value)} required />
-                                    <input type="number" placeholder="Qty" className="w-20 p-2 border rounded" value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} required />
-                                    <input type="number" placeholder="Price" className="w-24 p-2 border rounded" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} required />
-                                </div>
-                            ))}
-                            <button type="button" onClick={addItem} className="text-sm text-sky-600">+ Add Item</button>
-                            <div className="bg-slate-50 p-4 rounded text-right font-bold text-xl">${items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0).toFixed(2)}</div>
-                            <button disabled={saving} className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold">{saving ? "Generating..." : "Generate Invoice"}</button>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Select Customer</label>
+                                <select className="w-full p-2 border rounded" value={customerId} onChange={e => setCustomerId(e.target.value)}>
+                                    <option value="">Select a Customer</option>
+                                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Line Items</label>
+                                {items.map((item, idx) => (
+                                    <div key={idx} className="flex gap-2 mb-2">
+                                        <input placeholder="Description" className="flex-1 p-2 border rounded" value={item.desc} onChange={e => updateItem(idx, 'desc', e.target.value)} required />
+                                        <input type="number" placeholder="Qty" className="w-20 p-2 border rounded" value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} required />
+                                        <input type="number" placeholder="Price" className="w-24 p-2 border rounded" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} required />
+                                        {items.length > 1 && <button type="button" onClick={() => removeItem(idx)} className="text-red-500 p-2"><Trash2 size={16}/></button>}
+                                    </div>
+                                ))}
+                                <button type="button" onClick={addItem} className="text-sm text-sky-600 font-medium flex items-center gap-1 mt-2">+ Add Item</button>
+                            </div>
+
+                            <div className="bg-slate-50 p-4 rounded text-right">
+                                <span className="text-gray-500 mr-2">Total:</span>
+                                <span className="font-bold text-xl">${items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0).toFixed(2)}</span>
+                            </div>
+
+                            <button disabled={saving} className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold">
+                                {saving ? "Generating..." : "Generate Invoice"}
+                            </button>
                         </form>
                     </div>
                 );
             };
 
+            // --- 3. Vault Settings View ---
             const VaultSettings = () => {
                 const [form, setForm] = useState({ ...vaultSettings });
                 const [saved, setSaved] = useState(false);
+
                 const handleSave = (e) => {
                     e.preventDefault();
-                    setVaultSettings(DB.updateVaultSettings(form));
+                    const newSettings = DB.updateVaultSettings(form);
+                    setVaultSettings(newSettings);
                     setSaved(true);
                     setTimeout(() => setSaved(false), 2000);
                 };
+
                 return (
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm max-w-lg mx-auto animate-in fade-in slide-in-from-bottom-4">
                         <div className="flex items-center gap-2 mb-6 text-gray-900 font-bold text-xl">
                             <button onClick={() => setView('dashboard')} className="hover:bg-gray-100 p-1 rounded"><ChevronLeft /></button>
-                            <h3>Vault Settings</h3>
+                            <h3>Vault Allocation Settings</h3>
                         </div>
                         <form onSubmit={handleSave} className="space-y-4">
-                            <input className="w-full p-2 border rounded font-mono text-sm" value={form.address} onChange={e => setForm({...form, address: e.target.value})} placeholder="0x..." />
-                            <input type="number" className="w-full p-2 border rounded" value={form.percentage} onChange={e => setForm({...form, percentage: parseFloat(e.target.value)})} placeholder="2" step="0.1" />
-                            <button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-bold">{saved ? "Saved!" : "Save Configuration"}</button>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Vault Contract Address</label>
+                                <input 
+                                    className="w-full p-2 border rounded font-mono text-sm" 
+                                    value={form.address} 
+                                    onChange={e => setForm({...form, address: e.target.value})} 
+                                    placeholder="0x..."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Allocation Percentage (%)</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full p-2 border rounded" 
+                                    value={form.percentage} 
+                                    onChange={e => setForm({...form, percentage: parseFloat(e.target.value)})} 
+                                    placeholder="2"
+                                    step="0.1"
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Percentage of revenue allocated to the Vault.</p>
+                            </div>
+                            
+                            <button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-bold transition-colors">
+                                {saved ? "Settings Saved!" : "Save Configuration"}
+                            </button>
                         </form>
                     </div>
                 );
@@ -481,6 +539,7 @@
                             <p className="text-gray-500 text-sm font-medium">Total Revenue</p>
                             <h3 className="text-2xl font-bold text-gray-900">${totalRevenue.toFixed(2)}</h3>
                         </div>
+                        {/* Vault Share Card */}
                         <div className="bg-purple-50 p-6 rounded-xl border border-purple-100 shadow-sm">
                             <div className="flex justify-between items-start">
                                 <p className="text-purple-800 text-sm font-medium">Vault Share ({vaultSettings.percentage}%)</p>
@@ -490,21 +549,35 @@
                             <p className="text-xs text-purple-600 mt-1 truncate" title={vaultSettings.address}>To: {vaultSettings.address.substring(0,8)}...</p>
                         </div>
                         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                            <p className="text-gray-500 text-sm font-medium">Pending</p>
+                            <p className="text-gray-500 text-sm font-medium">Pending Invoices</p>
                             <h3 className="text-2xl font-bold text-orange-600">{invoices.filter(i => i.status === 'Pending').length}</h3>
                         </div>
                     </div>
+
                     <div className="flex gap-4">
-                        <button onClick={() => setView('add-invoice')} className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm"><FileText size={18} /> New Invoice</button>
-                        <button onClick={() => setView('view-customers')} className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition"><Users size={18} /> Manage Customers</button>
-                        <button onClick={() => setView('settings')} className="ml-auto flex items-center gap-2 text-slate-500 hover:text-slate-800 font-medium transition"><Settings size={20} /> Vault Settings</button>
+                        <button onClick={() => setView('add-invoice')} className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm">
+                            <FileText size={18} /> New Invoice
+                        </button>
+                        <button onClick={() => setView('view-customers')} className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition">
+                            <Users size={18} /> Manage Customers
+                        </button>
+                        <button onClick={() => setView('settings')} className="ml-auto flex items-center gap-2 text-slate-500 hover:text-slate-800 font-medium transition">
+                            <Settings size={20} /> Vault Settings
+                        </button>
                     </div>
+
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-200 bg-slate-50 font-bold text-gray-700">All Invoices</div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-left text-sm">
                                 <thead className="bg-slate-50 text-slate-500">
-                                    <tr><th className="px-6 py-3">Invoice #</th><th className="px-6 py-3">Customer</th><th className="px-6 py-3">Date</th><th className="px-6 py-3">Amount</th><th className="px-6 py-3">Status</th></tr>
+                                    <tr>
+                                        <th className="px-6 py-3 font-medium">Invoice #</th>
+                                        <th className="px-6 py-3 font-medium">Customer</th>
+                                        <th className="px-6 py-3 font-medium">Date</th>
+                                        <th className="px-6 py-3 font-medium">Amount</th>
+                                        <th className="px-6 py-3 font-medium">Status</th>
+                                    </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {invoices.map(inv => {
@@ -516,7 +589,11 @@
                                                 <td className="px-6 py-4 font-medium">{cust ? cust.name : 'Unknown'}</td>
                                                 <td className="px-6 py-4 text-gray-500">{inv.date}</td>
                                                 <td className="px-6 py-4 font-medium">${total.toFixed(2)}</td>
-                                                <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs font-bold ${inv.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{inv.status}</span></td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${inv.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                        {inv.status}
+                                                    </span>
+                                                </td>
                                             </tr>
                                         );
                                     })}
@@ -528,9 +605,17 @@
             );
         };
 
+        // --- CUSTOMER PORTAL COMPONENTS ---
+
         const ManualCryptoWidget = ({ address, amount, onClose }) => {
             const [copied, setCopied] = useState(false);
-            const handleCopy = () => { navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+            
+            const handleCopy = () => {
+                navigator.clipboard.writeText(address);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            };
+
             return (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
                     <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl flex flex-col">
@@ -538,17 +623,44 @@
                             <span className="font-bold tracking-tight flex items-center gap-2"><QrCode size={18}/> Manual Transfer</span>
                             <button onClick={onClose} className="hover:bg-white/20 p-1 rounded transition-colors">✕</button>
                         </div>
+                        
                         <div className="p-6 flex-col flex items-center text-center space-y-4">
-                            <div className="bg-white p-2 border border-gray-200 rounded-xl shadow-sm"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${address}`} alt="Wallet QR" className="w-40 h-40 object-contain rounded-lg" /></div>
+                            <div className="bg-white p-2 border border-gray-200 rounded-xl shadow-sm">
+                                {/* Dynamic QR Code Generation */}
+                                <img 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${address}`} 
+                                    alt="Wallet QR" 
+                                    className="w-40 h-40 object-contain rounded-lg"
+                                />
+                            </div>
+                            
                             <div>
                                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Send USDC (Arbitrum One)</p>
-                                <div onClick={handleCopy} className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center gap-2 cursor-pointer hover:border-sky-400 hover:bg-sky-50 transition-all group">
+                                <div 
+                                    onClick={handleCopy}
+                                    className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center gap-2 cursor-pointer hover:border-sky-400 hover:bg-sky-50 transition-all group"
+                                >
                                     <code className="text-xs font-mono text-slate-600 break-all">{address}</code>
-                                    <div className="text-slate-400 group-hover:text-sky-500">{copied ? <CheckCircle2 size={16}/> : <ArrowRight size={16} className="-rotate-45"/>}</div>
+                                    <div className="text-slate-400 group-hover:text-sky-500">
+                                        {copied ? <CheckCircle2 size={16}/> : <ArrowRight size={16} className="-rotate-45"/>}
+                                    </div>
                                 </div>
                                 {copied && <p className="text-xs text-green-600 font-bold mt-2 animate-pulse">Address Copied!</p>}
                             </div>
-                            <button onClick={onClose} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors">I have sent the payment</button>
+
+                            <div className="w-full bg-yellow-50 border border-yellow-100 rounded-lg p-3 text-left">
+                                <div className="flex gap-2">
+                                    <div className="text-yellow-600 mt-0.5"><Lock size={14}/></div>
+                                    <div className="text-xs text-yellow-800">
+                                        <p className="font-bold">Verify Network</p>
+                                        <p>Only send <b>USDC</b> on the <b>Arbitrum One</b> network. Other tokens may be lost.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button onClick={onClose} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors">
+                                I have sent the payment
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -558,61 +670,192 @@
         const InvoiceDetail = ({ invoice, customer, onBack, onPaymentSuccess }) => {
             const [paymentMethod, setPaymentMethod] = useState('stripe');
             const [showManualWidget, setShowManualWidget] = useState(false);
+            
             const totalAmount = invoice.items.reduce((acc, item) => acc + (item.qty * item.unitPrice), 0);
             
             if (invoice.status === 'Paid') {
                 return (
                     <div className="max-w-xl mx-auto text-center py-12">
-                        <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600"><CheckCircle2 size={48} /></div>
+                        <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600">
+                            <CheckCircle2 size={48} />
+                        </div>
                         <h2 className="text-3xl font-bold text-gray-900 mb-2">Invoice Paid</h2>
+                        <p className="text-gray-500 mb-8">This invoice has been settled. Thank you for your business.</p>
                         <button onClick={onBack} className="text-sky-600 hover:underline">Back to Invoices</button>
                     </div>
                 );
             }
+
             const handlePayment = () => {
                 if (paymentMethod === 'stripe') {
                     window.open(STRIPE_LINK, '_blank');
                 } else if (paymentMethod === 'moonpay') {
                     const walletAddress = customer.walletAddress || "0x000000000000000000000000000000000000dead"; 
+                    
+                    // FIXED: Removed invalid API Key and Amount parameters to match your working snippet.
+                    // This uses the simple default MoonPay flow.
                     const moonPayLink = `${MOONPAY_BASE_URL}?currencyCode=usdc_arbitrum&walletAddress=${walletAddress}`;
+                    
                     const confirmMsg = `Opening MoonPay to buy USDC (Arbitrum).\n\nIMPORTANT: Ensure the destination address is set to YOUR wallet:\n\n${walletAddress}\n\nClick OK to proceed.`;
-                    if(confirm(confirmMsg)) window.open(moonPayLink, '_blank');
+                    if(confirm(confirmMsg)) {
+                        window.open(moonPayLink, '_blank');
+                    }
                 } else {
+                    // Manual Crypto
                     setShowManualWidget(true);
                 }
             };
+
             return (
                 <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in slide-in-from-bottom-4">
                     <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
                         <div className="flex justify-between items-start mb-8 pb-8 border-b border-gray-100">
-                            <div><button onClick={onBack} className="mb-4 text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 no-print"><ChevronLeft size={16}/> Back</button><h1 className="text-2xl font-bold text-gray-900">INVOICE</h1><p className="text-gray-500 mt-1">{invoice.id}</p></div>
+                            <div>
+                                <button onClick={onBack} className="mb-4 text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 no-print"><ChevronLeft size={16}/> Back</button>
+                                <img src={LOGO_URL} alt="Logo" className="h-12 w-auto mb-4 object-contain" />
+                                <h1 className="text-2xl font-bold text-gray-900">INVOICE</h1>
+                                <p className="text-gray-500 mt-1">{invoice.id}</p>
+                            </div>
+                            <div className="text-right">
+                                <button onClick={() => window.print()} className="no-print inline-flex items-center gap-2 text-sm text-sky-600 font-medium hover:text-sky-700 bg-sky-50 px-3 py-1.5 rounded-lg transition-colors">
+                                    <Printer size={16} /> Print / PDF
+                                </button>
+                                <div className="mt-4">
+                                    <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                                        Unpaid
+                                    </div>
+                                </div>
+                            </div>
                         </div>
+
+                        <div className="grid md:grid-cols-2 gap-8 mb-8">
+                            <div>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Bill To</p>
+                                <p className="font-bold text-gray-900">{customer.name}</p>
+                                <p className="text-gray-500 text-sm mt-1">{customer.address}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Details</p>
+                                <p className="text-sm"><span className="text-gray-500">Date:</span> {invoice.date}</p>
+                                <p className="text-sm"><span className="text-gray-500">Due:</span> {invoice.dueDate}</p>
+                            </div>
+                        </div>
+
                         <table className="w-full text-sm text-left mb-8">
-                            <thead className="bg-slate-50 text-slate-500 font-medium"><tr><th className="px-4 py-3">Description</th><th className="px-4 py-3 text-center">Qty</th><th className="px-4 py-3 text-right">Price</th><th className="px-4 py-3 text-right">Total</th></tr></thead>
+                            <thead className="bg-slate-50 text-slate-500 font-medium">
+                                <tr>
+                                    <th className="px-4 py-3">Description</th>
+                                    <th className="px-4 py-3 text-center">Qty</th>
+                                    <th className="px-4 py-3 text-right">Price</th>
+                                    <th className="px-4 py-3 text-right">Total</th>
+                                </tr>
+                            </thead>
                             <tbody className="divide-y divide-gray-100">
                                 {invoice.items.map((item, i) => (
-                                    <tr key={i}><td className="px-4 py-4">{item.desc}</td><td className="px-4 py-4 text-center">{item.qty}</td><td className="px-4 py-4 text-right">${item.unitPrice.toFixed(2)}</td><td className="px-4 py-4 text-right font-medium">${(item.qty * item.unitPrice).toFixed(2)}</td></tr>
+                                    <tr key={i}>
+                                        <td className="px-4 py-4">{item.desc}</td>
+                                        <td className="px-4 py-4 text-center">{item.qty}</td>
+                                        <td className="px-4 py-4 text-right">${item.unitPrice.toFixed(2)}</td>
+                                        <td className="px-4 py-4 text-right font-medium">${(item.qty * item.unitPrice).toFixed(2)}</td>
+                                    </tr>
                                 ))}
                             </tbody>
                         </table>
-                        <div className="flex justify-end border-t border-gray-100 pt-6"><div className="w-48 flex justify-between items-center text-lg font-bold text-gray-900"><span>Total Due</span><span>${totalAmount.toFixed(2)}</span></div></div>
+
+                        <div className="flex justify-end border-t border-gray-100 pt-6">
+                            <div className="w-48 flex justify-between items-center text-lg font-bold text-gray-900">
+                                <span>Total Due</span>
+                                <span>${totalAmount.toFixed(2)}</span>
+                            </div>
+                        </div>
                     </div>
+
                     <div className="w-full lg:w-[380px] no-print">
                         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-24">
                             <h3 className="font-bold text-gray-900 mb-4">Select Payment Method</h3>
-                            <div onClick={() => setPaymentMethod('stripe')} className={`p-4 rounded-xl border-2 cursor-pointer mb-3 transition-all ${paymentMethod === 'stripe' ? 'border-[#635BFF] bg-indigo-50' : 'border-gray-100 hover:border-gray-200'}`}>
-                                <div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${paymentMethod === 'stripe' ? 'bg-[#635BFF] text-white' : 'bg-gray-100 text-gray-500'}`}><CreditCard size={20} /></div><div className="flex-1"><p className="font-semibold text-gray-900">Credit Card</p><p className="text-xs text-gray-500">via Stripe</p></div></div>
+                            
+                            {/* Option 1: Stripe */}
+                            <div 
+                                onClick={() => setPaymentMethod('stripe')} 
+                                className={`p-4 rounded-xl border-2 cursor-pointer mb-3 transition-all ${paymentMethod === 'stripe' ? 'border-[#635BFF] bg-indigo-50' : 'border-gray-100 hover:border-gray-200'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg ${paymentMethod === 'stripe' ? 'bg-[#635BFF] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                        <CreditCard size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-900">Credit Card</p>
+                                        <p className="text-xs text-gray-500">via Stripe Checkout</p>
+                                    </div>
+                                    {paymentMethod === 'stripe' && <CheckCircle2 size={20} className="ml-auto text-[#635BFF]" />}
+                                </div>
                             </div>
-                            <div onClick={() => setPaymentMethod('moonpay')} className={`p-4 rounded-xl border-2 cursor-pointer mb-3 transition-all ${paymentMethod === 'moonpay' ? 'border-[#7D00FF] bg-purple-50' : 'border-gray-100 hover:border-gray-200'}`}>
-                                <div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${paymentMethod === 'moonpay' ? 'bg-[#7D00FF] text-white' : 'bg-gray-100 text-gray-500'}`}><Wallet size={20} /></div><div className="flex-1"><p className="font-semibold text-gray-900">Crypto / Card</p><p className="text-xs text-gray-500">via MoonPay</p></div></div>
+
+                            {/* Option 2: MoonPay */}
+                            <div 
+                                onClick={() => setPaymentMethod('moonpay')} 
+                                className={`p-4 rounded-xl border-2 cursor-pointer mb-3 transition-all ${paymentMethod === 'moonpay' ? 'border-[#7D00FF] bg-purple-50' : 'border-gray-100 hover:border-gray-200'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg ${paymentMethod === 'moonpay' ? 'bg-[#7D00FF] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                        <Wallet size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-900">Crypto / Card</p>
+                                        <p className="text-xs text-gray-500">via MoonPay Self-Custody</p>
+                                    </div>
+                                    {paymentMethod === 'moonpay' && <CheckCircle2 size={20} className="ml-auto text-[#7D00FF]" />}
+                                </div>
                             </div>
-                            <div onClick={() => setPaymentMethod('manual')} className={`p-4 rounded-xl border-2 cursor-pointer mb-6 transition-all ${paymentMethod === 'manual' ? 'border-sky-500 bg-sky-50' : 'border-gray-100 hover:border-gray-200'}`}>
-                                <div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${paymentMethod === 'manual' ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-500'}`}><QrCode size={20} /></div><div className="flex-1"><p className="font-semibold text-gray-900">Manual Transfer</p><p className="text-xs text-gray-500">External Wallet</p></div></div>
+
+                            {/* Option 3: Manual Crypto (NEW) */}
+                            <div 
+                                onClick={() => setPaymentMethod('manual')} 
+                                className={`p-4 rounded-xl border-2 cursor-pointer mb-6 transition-all ${paymentMethod === 'manual' ? 'border-sky-500 bg-sky-50' : 'border-gray-100 hover:border-gray-200'}`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`p-2 rounded-lg ${paymentMethod === 'manual' ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                        <QrCode size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="font-semibold text-gray-900">Manual Transfer</p>
+                                        <p className="text-xs text-gray-500">From External Wallet</p>
+                                    </div>
+                                    {paymentMethod === 'manual' && <CheckCircle2 size={20} className="ml-auto text-sky-500" />}
+                                </div>
                             </div>
-                            <button onClick={handlePayment} className={`w-full text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 ${paymentMethod === 'stripe' ? 'bg-[#635BFF]' : paymentMethod === 'moonpay' ? 'bg-[#7D00FF]' : 'bg-sky-500'}`}>Pay Now</button>
+
+                            <button 
+                                onClick={handlePayment} 
+                                className={`w-full text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 ${
+                                    paymentMethod === 'stripe' ? 'bg-[#635BFF] hover:bg-[#534be0]' : 
+                                    paymentMethod === 'moonpay' ? 'bg-[#7D00FF] hover:bg-[#6a00d8]' :
+                                    'bg-sky-500 hover:bg-sky-600'
+                                }`}
+                            >
+                                {paymentMethod === 'stripe' ? (
+                                    <>Pay via Stripe <ExternalLink size={18} /></>
+                                ) : paymentMethod === 'moonpay' ? (
+                                    <>Pay via MoonPay <ExternalLink size={18} /></>
+                                ) : (
+                                    <>Show Payment Address <QrCode size={18} /></>
+                                )}
+                            </button>
+                            
+                            <div className="flex items-center justify-center gap-2 mt-4 text-xs text-gray-400">
+                                <Lock size={12}/> Secure 256-bit Encrypted
+                            </div>
                         </div>
                     </div>
-                    {showManualWidget && <ManualCryptoWidget address={customer.walletAddress || "Loading..."} amount={totalAmount} onClose={() => setShowManualWidget(false)} />}
+
+                    {/* RENDER MANUAL WIDGET IF SELECTED */}
+                    {showManualWidget && (
+                        <ManualCryptoWidget 
+                            address={customer.walletAddress || "Loading..."} 
+                            amount={totalAmount}
+                            onClose={() => setShowManualWidget(false)}
+                        />
+                    )}
                 </div>
             );
         };
@@ -620,35 +863,117 @@
         const CustomerDashboard = ({ user, invoices, onUpdateStatus, onSaveProfile }) => {
             const [selectedInvoice, setSelectedInvoice] = useState(null);
             const [isEditing, setIsEditing] = useState(false);
-            const [profileForm, setProfileForm] = useState({ name: user.name || "", address: user.address || "" });
-            useEffect(() => { setProfileForm({ name: user.name || "", address: user.address || "" }); }, [user]);
-            const handleSave = async (e) => { e.preventDefault(); await onSaveProfile(profileForm); setIsEditing(false); };
-            if (selectedInvoice) return <InvoiceDetail invoice={selectedInvoice} customer={user} onBack={() => setSelectedInvoice(null)} onPaymentSuccess={() => { onUpdateStatus(selectedInvoice.id, 'Paid'); setSelectedInvoice({...selectedInvoice, status: 'Paid'}); }} />;
+            const [profileForm, setProfileForm] = useState({
+                name: user.name || "",
+                address: user.address || ""
+            });
+
+            // Update form when user prop updates (e.g. after save)
+            useEffect(() => {
+                setProfileForm({
+                    name: user.name || "",
+                    address: user.address || ""
+                });
+            }, [user]);
+            
+            const myInvoices = invoices.filter(i => {
+                return true; 
+            });
+
+            // Handle Saving Profile from Customer Dashboard
+            const handleSave = async (e) => {
+                e.preventDefault();
+                await onSaveProfile(profileForm);
+                setIsEditing(false);
+            };
+
+            if (selectedInvoice) {
+                return (
+                    <InvoiceDetail 
+                        invoice={selectedInvoice} 
+                        customer={user} 
+                        onBack={() => setSelectedInvoice(null)} 
+                        onPaymentSuccess={() => {
+                            onUpdateStatus(selectedInvoice.id, 'Paid');
+                            setSelectedInvoice({...selectedInvoice, status: 'Paid'});
+                        }}
+                    />
+                );
+            }
+
             return (
                 <div className="max-w-4xl mx-auto space-y-8">
+                    {/* Profile Section */}
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                        <div className="flex justify-between items-start mb-4"><h2 className="text-xl font-bold text-gray-900">My Information</h2>{!isEditing && <button onClick={() => setIsEditing(true)} className="text-sky-600 text-sm font-medium hover:underline flex items-center gap-1"><Edit size={16} /> Edit Info</button>}</div>
+                        <div className="flex justify-between items-start mb-4">
+                            <h2 className="text-xl font-bold text-gray-900">My Information</h2>
+                            {!isEditing && (
+                                <button onClick={() => setIsEditing(true)} className="text-sky-600 text-sm font-medium hover:underline flex items-center gap-1">
+                                    <Edit size={16} /> Edit Info
+                                </button>
+                            )}
+                        </div>
+
                         {isEditing ? (
                             <form onSubmit={handleSave} className="space-y-4">
-                                <input className="w-full p-2 border rounded" value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} placeholder="Name" />
-                                <textarea className="w-full p-2 border rounded" value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} placeholder="Address" />
-                                <button className="bg-sky-500 text-white px-4 py-2 rounded-lg">Save</button>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Name</label>
+                                    <input className="w-full p-2 border rounded" value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} required placeholder="Your full name" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700">Service Address</label>
+                                    <textarea className="w-full p-2 border rounded" value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} required placeholder="123 Example St" />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button type="submit" className="bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg text-sm font-medium">Save Information</button>
+                                    <button type="button" onClick={() => setIsEditing(false)} className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium">Cancel</button>
+                                </div>
                             </form>
                         ) : (
                             <div className="grid md:grid-cols-2 gap-4 text-sm">
-                                <div><p className="text-gray-500">Name</p><p className="font-medium text-lg">{user.name || "N/A"}</p></div>
-                                <div><p className="text-gray-500">Address</p><p className="font-medium">{user.address || "N/A"}</p></div>
-                                <div><p className="text-gray-500">Wallet</p><p className="font-mono bg-slate-100 px-3 py-1.5 rounded-lg text-xs text-sky-700 break-all border border-slate-200">{user.walletAddress}</p></div>
+                                <div>
+                                    <p className="text-gray-500">Customer Name</p>
+                                    <p className="font-medium text-lg">{user.name || "N/A"}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">Email</p>
+                                    <p className="font-medium">{user.email || "N/A (Wallet Login)"}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">Service Address</p>
+                                    <p className="font-medium">{user.address || "N/A"}</p>
+                                </div>
+                                <div>
+                                    <p className="text-gray-500">User ID (Wallet Address)</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <p className="font-mono bg-slate-100 px-3 py-1.5 rounded-lg text-xs text-sky-700 break-all border border-slate-200">
+                                            {user.walletAddress || "Will generate after first save"}
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         )}
                     </div>
+
+                    {/* Invoices Section */}
                     <div>
                         <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Invoices</h2>
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                            {invoices.length === 0 ? <div className="p-8 text-center text-gray-500">No invoices found.</div> : (
+                            {invoices.length === 0 ? (
+                                <div className="p-8 text-center text-gray-500">No invoices found.</div>
+                            ) : (
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-left">
-                                        <thead className="bg-slate-50 text-slate-500 text-sm"><tr><th className="px-6 py-4">Invoice #</th><th className="px-6 py-4">Date</th><th className="px-6 py-4">Due</th><th className="px-6 py-4">Total</th><th className="px-6 py-4">Status</th><th className="px-6 py-4"></th></tr></thead>
+                                        <thead className="bg-slate-50 text-slate-500 text-sm">
+                                            <tr>
+                                                <th className="px-6 py-4 font-medium">Invoice #</th>
+                                                <th className="px-6 py-4 font-medium">Date</th>
+                                                <th className="px-6 py-4 font-medium">Due</th>
+                                                <th className="px-6 py-4 font-medium">Total</th>
+                                                <th className="px-6 py-4 font-medium">Status</th>
+                                                <th className="px-6 py-4"></th>
+                                            </tr>
+                                        </thead>
                                         <tbody className="divide-y divide-gray-100">
                                             {invoices.map(inv => {
                                                 const total = inv.items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0);
@@ -658,8 +983,16 @@
                                                         <td className="px-6 py-4 text-sm text-gray-600">{inv.date}</td>
                                                         <td className="px-6 py-4 text-sm text-gray-600">{inv.dueDate}</td>
                                                         <td className="px-6 py-4 font-medium text-gray-900">${total.toFixed(2)}</td>
-                                                        <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs font-bold ${inv.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{inv.status}</span></td>
-                                                        <td className="px-6 py-4 text-right"><button onClick={() => setSelectedInvoice(inv)} className="text-sky-600 hover:text-sky-800 font-medium text-sm flex items-center gap-1">View <ArrowRight size={14} /></button></td>
+                                                        <td className="px-6 py-4">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-bold ${inv.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                                {inv.status}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right">
+                                                            <button onClick={() => setSelectedInvoice(inv)} className="text-sky-600 hover:text-sky-800 font-medium text-sm flex items-center gap-1">
+                                                                View <ArrowRight size={14} />
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 );
                                             })}
@@ -673,45 +1006,81 @@
             );
         };
 
+        // --- MAIN APP SHELL ---
         const App = () => {
             const [user, setUser] = useState(null);
             const [customers, setCustomers] = useState([]);
             const [invoices, setInvoices] = useState([]);
 
+            // 1. Listen for Auth Changes (Disabled for Web3Auth only)
+            // useEffect(() => { ... });
+
+            // 2. Listen for Database Changes (Real-Time Sync)
             useEffect(() => {
                 if (!user) return;
+
+                // Load Customers
                 const unsubCustomers = onSnapshot(collection(db, "customers"), (snapshot) => {
-                    setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                });
-                const unsubInvoices = onSnapshot(collection(db, "invoices"), (snapshot) => {
                     const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    setCustomers(list);
+                });
+
+                // Load Invoices
+                let q = collection(db, "invoices");
+                
+                const unsubInvoices = onSnapshot(q, (snapshot) => {
+                    const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    
                     if (user.isAdmin) {
                         setInvoices(list);
                     } else {
-                        const myCustomerRecord = customers.find(c => (user.walletAddress && c.walletAddress === user.walletAddress));
+                        const myCustomerRecord = customers.find(c => c.email === user.email || (user.walletAddress && c.walletAddress === user.walletAddress));
                         if (myCustomerRecord) {
-                            setInvoices(list.filter(inv => inv.customerId === myCustomerRecord.id));
+                             setInvoices(list.filter(inv => inv.customerId === myCustomerRecord.id));
                         } else {
                             setInvoices([]); 
                         }
                     }
                 });
-                return () => { unsubCustomers(); unsubInvoices(); };
-            }, [user, customers.length]);
 
+                return () => {
+                    unsubCustomers();
+                    unsubInvoices();
+                };
+            }, [user, customers.length]); 
+
+            // Handle Saving Profile from Customer Dashboard
             const handleSaveProfile = async (data) => {
-                // Identify by wallet address since we removed email auth
-                const q = query(collection(db, "customers"), where("walletAddress", "==", user.walletAddress));
+                // Query Firestore directly to avoid race conditions with local state
+                // Query by email OR wallet address to find existing record
+                let q;
+                if (user.email) {
+                    q = query(collection(db, "customers"), where("email", "==", user.email));
+                } else if (user.walletAddress) {
+                    q = query(collection(db, "customers"), where("walletAddress", "==", user.walletAddress));
+                }
+
                 const querySnapshot = await getDocs(q);
+
                 if (!querySnapshot.empty) {
-                    await DB.updateCustomer(querySnapshot.docs[0].id, data);
+                    // User exists - Update the existing record
+                    const docId = querySnapshot.docs[0].id;
+                    await DB.updateCustomer(docId, data);
                 } else {
-                    await DB.addCustomer({ ...data, walletAddress: user.walletAddress });
+                    // Really is a new user - Create record
+                    // If wallet user, ensure wallet address is saved
+                    await DB.addCustomer({ 
+                        ...data, 
+                        email: user.email || "", 
+                        walletAddress: user.walletAddress || null
+                    });
                 }
             };
 
             const handleLogout = async () => {
-                if(user.web3authInstance) await user.web3authInstance.logout();
+                if(user.web3authInstance) {
+                    await user.web3authInstance.logout();
+                }
                 setUser(null);
                 setCustomers([]);
                 setInvoices([]);
@@ -720,10 +1089,31 @@
             return (
                 <div className="min-h-screen pb-12">
                     <Navbar user={user} onLogout={handleLogout} />
+                    
                     <main className="container mx-auto px-4 py-8">
-                        {!user ? <LoginScreen onLogin={(u) => setUser(u)} /> : user.isAdmin ? <AdminDashboard customers={customers} invoices={invoices} onAddCustomer={DB.addCustomer} onDeleteCustomer={DB.deleteCustomer} onAddInvoice={DB.addInvoice} /> : <CustomerDashboard user={customers.find(c => (user.walletAddress && c.walletAddress === user.walletAddress)) || user} invoices={invoices} onUpdateStatus={DB.updateInvoiceStatus} onSaveProfile={handleSaveProfile} />}
+                        {!user ? (
+                            <LoginScreen onLogin={(u) => setUser(u)} />
+                        ) : user.isAdmin ? (
+                            <AdminDashboard 
+                                customers={customers} 
+                                invoices={invoices} 
+                                onAddCustomer={DB.addCustomer}
+                                onDeleteCustomer={DB.deleteCustomer}
+                                onAddInvoice={DB.addInvoice}
+                            />
+                        ) : (
+                            <CustomerDashboard 
+                                user={customers.find(c => c.email === user.email || (user.walletAddress && c.walletAddress === user.walletAddress)) || user} 
+                                invoices={invoices}
+                                onUpdateStatus={DB.updateInvoiceStatus}
+                                onSaveProfile={handleSaveProfile}
+                            />
+                        )}
                     </main>
-                    <footer className="text-center text-sm text-gray-400 py-8 no-print"><p>&copy; 2024 Mechanical Temp LLC. Secure Payment Portal.</p></footer>
+
+                    <footer className="text-center text-sm text-gray-400 py-8 no-print">
+                        <p>&copy; 2024 Mechanical Temp LLC. Secure Payment Portal.</p>
+                    </footer>
                 </div>
             );
         };
