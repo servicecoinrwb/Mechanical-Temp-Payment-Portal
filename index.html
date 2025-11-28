@@ -480,6 +480,8 @@
                 const [customerId, setCustomerId] = useState(isEdit ? editingInvoice.customerId : "");
                 const [items, setItems] = useState(isEdit ? editingInvoice.items : [{ desc: "", qty: 1, unitPrice: 0 }]);
                 const [comments, setComments] = useState(isEdit ? (editingInvoice.comments || "") : "");
+                // NEW: Added Due Date State
+                const [dueDate, setDueDate] = useState(isEdit ? (editingInvoice.dueDate || "Due on Receipt") : "Due on Receipt");
                 const [saving, setSaving] = useState(false);
                 
                 const addItem = () => setItems([...items, { desc: "", qty: 1, unitPrice: 0 }]);
@@ -498,7 +500,8 @@
                     const invoiceData = {
                         customerId: customerId,
                         items: items.map(i => ({...i, unitPrice: parseFloat(i.unitPrice), qty: parseFloat(i.qty)})),
-                        comments: comments
+                        comments: comments,
+                        dueDate: dueDate // Save the selected term
                     };
 
                     if (isEdit) {
@@ -508,7 +511,6 @@
                             ...invoiceData,
                             id: `INV-${Date.now().toString().slice(-6)}`,
                             date: new Date().toISOString().split('T')[0],
-                            dueDate: "Net 30",
                             status: "Pending",
                         });
                     }
@@ -527,6 +529,19 @@
                                 <select className="w-full p-2 border rounded" value={customerId} onChange={e => setCustomerId(e.target.value)}>
                                     <option value="">Select a Customer</option>
                                     {(customers || []).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+
+                            {/* NEW: Payment Terms Dropdown */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
+                                <select className="w-full p-2 border rounded" value={dueDate} onChange={e => setDueDate(e.target.value)}>
+                                    <option value="Due on Receipt">Due on Receipt</option>
+                                    <option value="Net 7">Net 7</option>
+                                    <option value="Net 15">Net 15</option>
+                                    <option value="Net 30">Net 30</option>
+                                    <option value="Net 45">Net 45</option>
+                                    <option value="Net 60">Net 60</option>
                                 </select>
                             </div>
                             
