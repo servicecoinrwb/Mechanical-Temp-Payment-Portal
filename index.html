@@ -122,8 +122,8 @@
             init: async () => {
                 if (!localStorage.getItem('mt_vault_settings')) {
                     localStorage.setItem('mt_vault_settings', JSON.stringify({
-                        address: "0xE6b8EAb212c8E33c825e49E6C36F3030955E890d",
-                        bankAddress: "0xdFD1C01678e713FDe1630c9db921e6206f3795b4",
+                        address: "0xdFD1C01678e713FDe1630c9db921e6206f3795b4",
+                        bankAddress: "0xE6b8EAb212c8E33c825e49E6C36F3030955E890d",
                         percentage: 2
                     }));
                 }
@@ -131,8 +131,8 @@
             // Ensures Bank Address has a default if not set in localStorage
             getVaultSettings: () => {
                 const defaults = {
-                    address: "0xE6b8EAb212c8E33c825e49E6C36F3030955E890d",
-                    bankAddress: "0xdFD1C01678e713FDe1630c9db921e6206f3795b4",
+                    address: "0xdFD1C01678e713FDe1630c9db921e6206f3795b4",
+                    bankAddress: "0xE6b8EAb212c8E33c825e49E6C36F3030955E890d",
                     percentage: 2
                 };
                 try {
