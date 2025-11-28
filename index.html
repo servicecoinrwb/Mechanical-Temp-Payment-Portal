@@ -66,12 +66,13 @@
             measurementId: "G-0W6T5ZYR7Q"
         };
 
-        // Initialize Firebase (DB Only - No Auth)
+        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
         // --- WEB3AUTH CONFIGURATION ---
-        const WEB3AUTH_CLIENT_ID = "BOp1I844CnOw4gAPJXft8hk0r1z8OiwiquU9-qOtY3xedheGn13tykbaJa6xty2dGtOpCE2vnOZsFxYwKhM8w58"; 
+        // UPDATED: Correct Client ID
+        const WEB3AUTH_CLIENT_ID = "BHF9CqnAVImFVStW0OXLuKvgef28VqIAZ8jyngsS-HSuAiuAsgIra04uPbO7-VZpccAdNt56DAWCDaZDbWP6PEA"; 
         const CHAIN_ID = "0xa4b1"; // Arbitrum One
         const RPC_URL = "https://arb1.arbitrum.io/rpc";
 
@@ -107,6 +108,7 @@
         // --- REAL WORLD LINKS ---
         const STRIPE_LINK = "https://buy.stripe.com/bIY01kg5K3zD5I4fYY?_gl=1*1drrzbk*_ga*MjA1MzE1MDM4OS4xNzY0MDk4ODc4*_ga_0G63KLB2B0*czE3NjQxMDQwODgkbzEkZzEkdDE3NjQxMDQxOTckajU2JGwwJGgw";
         const MOONPAY_BASE_URL = "https://buy.moonpay.com";
+        const MOONPAY_API_KEY = "pk_test_YOUR_MOONPAY_KEY"; 
         
         // --- FIRESTORE DATABASE HELPERS ---
         const DB = {
@@ -201,21 +203,26 @@
                     const privateKeyProvider = new EthereumPrivateKeyProvider({ config: { chainConfig } });
                     
                     const web3auth = new Web3Auth({
-                        clientId: "BHF9CqnAVImFVStW0OXLuKvgef28VqIAZ8jyngsS-HSuAiuAsgIra04uPbO7-VZpccAdNt56DAWCDaZDbWP6PEA",
+                        clientId: WEB3AUTH_CLIENT_ID,
                         web3AuthNetwork: "sapphire_mainnet",
                         privateKeyProvider
                     });
 
                     await web3auth.initModal();
                     
+                    // Connect (Modal opens here)
                     const provider = await web3auth.connect();
+                    
+                    // Get User Info
                     const userInfo = await web3auth.getUserInfo();
                     
+                    // Get Wallet Address (Ethers v6)
                     const ethersProvider = new ethers.BrowserProvider(provider);
                     const signer = await ethersProvider.getSigner();
                     const address = await signer.getAddress();
 
                     // --- IDENTITY CHECK ---
+                    // Check if Admin
                     if (userInfo.email === "admin@mechanicaltemp.com") {
                         onLogin({ email: userInfo.email, isAdmin: true, name: "Admin", web3authInstance: web3auth });
                         return;
@@ -233,17 +240,19 @@
                     
                     let userData;
                     if (!querySnapshot.empty) {
+                        // Returning User
                         const docData = querySnapshot.docs[0].data();
                         userData = {
                             id: querySnapshot.docs[0].id,
                             email: userInfo.email || docData.email,
                             name: docData.name || userInfo.name || "User",
-                            walletAddress: address, 
+                            walletAddress: address, // Ensure we use the real address
                             isAdmin: false,
                             address: docData.address || "",
                             web3authInstance: web3auth
                         };
                     } else {
+                        // New User
                         userData = {
                             email: userInfo.email || "",
                             name: userInfo.name || "Guest",
@@ -285,7 +294,7 @@
                                 className="w-full flex items-center justify-center gap-3 bg-sky-500 hover:bg-sky-600 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg shadow-sky-200 transform hover:scale-[1.02]"
                             >
                                 {isLoading ? <Loader2 className="animate-spin" /> : <Wallet size={20} />}
-                                <span>Log In to Portal</span>
+                                <span>Login / Connect Wallet</span>
                             </button>
 
                             <div className="text-center text-xs text-gray-400 mt-4 flex items-center justify-center gap-2">
@@ -373,7 +382,7 @@
                     setSaving(true);
                     await onAddCustomer(form);
                     setSaving(false);
-                    setView('view-customers');
+                    setView('view-customers'); // Go back to list after adding
                 };
                 return (
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm max-w-lg mx-auto animate-in fade-in slide-in-from-bottom-4">
@@ -422,7 +431,7 @@
                     
                     const newInvoice = {
                         id: `INV-${Date.now().toString().slice(-6)}`,
-                        customerId: customerId,
+                        customerId: customerId, // Firestore ID
                         date: new Date().toISOString().split('T')[0],
                         dueDate: "Net 30",
                         status: "Pending",
@@ -860,7 +869,7 @@
             );
         };
 
-        const CustomerDashboard = ({ user, invoices, onUpdateStatus, onSaveProfile }) => {
+        const CustomerDashboard = ({ user, invoices, onUpdateStatus, onSaveProfile }) => { // Added onSaveProfile
             const [selectedInvoice, setSelectedInvoice] = useState(null);
             const [isEditing, setIsEditing] = useState(false);
             const [profileForm, setProfileForm] = useState({
