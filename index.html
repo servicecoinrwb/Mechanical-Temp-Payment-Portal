@@ -97,6 +97,7 @@
         const Edit = (p) => <IconWrapper {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></IconWrapper>;
         const QrCode = (p) => <IconWrapper {...p}><rect width="5" height="5" x="3" y="3" rx="1" /><rect width="5" height="5" x="16" y="3" rx="1" /><rect width="5" height="5" x="3" y="16" rx="1" /><path d="M21 16h-3a2 2 0 0 0-2 2v3" /><path d="M21 21v.01" /><path d="M12 7v3a2 2 0 0 1-2 2H7" /><path d="M3 12h.01" /><path d="M12 3h.01" /><path d="M12 16v.01" /><path d="M16 12h1" /><path d="M21 12v.01" /><path d="M12 21v-1" /></IconWrapper>;
         const Settings = (p) => <IconWrapper {...p}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></IconWrapper>;
+        const Fuel = (p) => <IconWrapper {...p}><path d="M3 22v-8a2 2 0 0 1 2-2h2.5a2 2 0 0 1 2 2v8"/><path d="M15 9a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2Z"/><path d="M14 13h2a2 2 0 0 1 2 2v1a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2v-3.5"/><path d="M3 22h18"/><path d="M10 22V8a2 2 0 0 0-2-2H5.5a2 2 0 0 0-2 2v14"/></IconWrapper>;
 
         // --- CONSTANTS ---
         const LOGO_URL = "https://imageview.replit.app/objects/uploads/d16ab63e-1d1e-4b8f-863c-67e66e4894fc";
@@ -109,11 +110,12 @@
                 if (!localStorage.getItem('mt_vault_settings')) {
                     localStorage.setItem('mt_vault_settings', JSON.stringify({
                         address: "0xdFD1C01678e713FDe1630c9db921e6206f3795b4",
+                        bankAddress: "",
                         percentage: 2
                     }));
                 }
             },
-            getVaultSettings: () => JSON.parse(localStorage.getItem('mt_vault_settings') || '{"address": "0xdFD1C01678e713FDe1630c9db921e6206f3795b4", "percentage": 2}'),
+            getVaultSettings: () => JSON.parse(localStorage.getItem('mt_vault_settings') || '{"address": "0xdFD1C01678e713FDe1630c9db921e6206f3795b4", "bankAddress": "", "percentage": 2}'),
             updateVaultSettings: (settings) => {
                 localStorage.setItem('mt_vault_settings', JSON.stringify(settings));
                 return settings;
@@ -281,11 +283,34 @@
             );
         };
 
-        const AdminDashboard = ({ customers, invoices, onAddCustomer, onAddInvoice, onDeleteCustomer }) => {
+        const AdminDashboard = ({ user, customers, invoices, onAddCustomer, onAddInvoice, onDeleteCustomer }) => {
             const [view, setView] = useState('dashboard');
             const [vaultSettings, setVaultSettings] = useState(DB.getVaultSettings());
 
             useEffect(() => { DB.init(); }, []);
+
+            const handleFundGas = async (customerAddress) => {
+                if (!user || !user.web3authInstance) return alert("Admin wallet not connected via Web3Auth to send funds.");
+                
+                const amount = "0.002";
+                if(!confirm(`Send ${amount} ETH to customer ${customerAddress} for gas fees?`)) return;
+
+                try {
+                    const provider = new ethers.BrowserProvider(user.web3authInstance.provider);
+                    const signer = await provider.getSigner();
+                    
+                    // Simple ETH Transfer
+                    const tx = await signer.sendTransaction({
+                        to: customerAddress,
+                        value: ethers.parseEther(amount)
+                    });
+                    
+                    alert(`Gas Sent! Transaction Hash:\n${tx.hash}`);
+                } catch (e) {
+                    console.error(e);
+                    alert("Failed to send gas: " + (e.reason || e.message));
+                }
+            };
 
             const CustomerList = () => {
                 return (
@@ -305,7 +330,10 @@
                                             <td className="px-6 py-4 text-gray-600">{c.email}</td>
                                             <td className="px-6 py-4 text-gray-500 truncate max-w-xs">{c.address}</td>
                                             <td className="px-6 py-4 font-mono text-xs text-sky-600">{c.walletAddress ? c.walletAddress.substring(0,6)+'...'+c.walletAddress.substring(c.walletAddress.length-4) : '-'}</td>
-                                            <td className="px-6 py-4 text-right"><button onClick={() => { if(confirm(`Delete ${c.name}?`)) onDeleteCustomer(c.id); }} className="text-gray-400 hover:text-red-600 p-2"><Trash2 size={18} /></button></td>
+                                            <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                                <button onClick={() => handleFundGas(c.walletAddress)} className="text-gray-400 hover:text-yellow-600 p-2" title="Fund Gas (ETH)"><Fuel size={18} /></button>
+                                                <button onClick={() => { if(confirm(`Delete ${c.name}?`)) onDeleteCustomer(c.id); }} className="text-gray-400 hover:text-red-600 p-2"><Trash2 size={18} /></button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -402,8 +430,18 @@
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm max-w-lg mx-auto animate-in fade-in slide-in-from-bottom-4">
                         <div className="flex items-center gap-2 mb-6 text-gray-900 font-bold text-xl"><button onClick={() => setView('dashboard')} className="hover:bg-gray-100 p-1 rounded"><ChevronLeft /></button><h3>Vault Allocation Settings</h3></div>
                         <form onSubmit={handleSave} className="space-y-4">
-                            <input className="w-full p-2 border rounded font-mono text-sm" value={form.address} onChange={e => setForm({...form, address: e.target.value})} placeholder="0x..." />
-                            <input type="number" className="w-full p-2 border rounded" value={form.percentage} onChange={e => setForm({...form, percentage: parseFloat(e.target.value)})} placeholder="2" step="0.1" />
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Vault (Profit) Address</label>
+                                <input className="w-full p-2 border rounded font-mono text-sm" value={form.address} onChange={e => setForm({...form, address: e.target.value})} placeholder="0x..." />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Bank (Revenue) Wallet Address</label>
+                                <input className="w-full p-2 border rounded font-mono text-sm" value={form.bankAddress} onChange={e => setForm({...form, bankAddress: e.target.value})} placeholder="0x..." />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Allocation Percentage (%)</label>
+                                <input type="number" className="w-full p-2 border rounded" value={form.percentage} onChange={e => setForm({...form, percentage: parseFloat(e.target.value)})} placeholder="2" step="0.1" />
+                            </div>
                             <button className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-bold transition-colors">{saved ? "Settings Saved!" : "Save Configuration"}</button>
                         </form>
                     </div>
@@ -661,7 +699,7 @@
                 <div className="min-h-screen pb-12">
                     <Navbar user={user} onLogout={handleLogout} />
                     <main className="container mx-auto px-4 py-8">
-                        {!user ? <LoginScreen onLogin={(u) => setUser(u)} /> : user.isAdmin ? <AdminDashboard customers={customers} invoices={invoices} onAddCustomer={DB.addCustomer} onDeleteCustomer={DB.deleteCustomer} onAddInvoice={DB.addInvoice} /> : <CustomerDashboard user={(customers || []).find(c => c.email === user.email || (user.walletAddress && c.walletAddress === user.walletAddress)) || user} invoices={invoices} onUpdateStatus={DB.updateInvoiceStatus} onSaveProfile={handleSaveProfile} />}
+                        {!user ? <LoginScreen onLogin={(u) => setUser(u)} /> : user.isAdmin ? <AdminDashboard user={user} customers={customers} invoices={invoices} onAddCustomer={DB.addCustomer} onDeleteCustomer={DB.deleteCustomer} onAddInvoice={DB.addInvoice} /> : <CustomerDashboard user={(customers || []).find(c => c.email === user.email || (user.walletAddress && c.walletAddress === user.walletAddress)) || user} invoices={invoices} onUpdateStatus={DB.updateInvoiceStatus} onSaveProfile={handleSaveProfile} />}
                     </main>
                     <footer className="text-center text-sm text-gray-400 py-8 no-print"><p>&copy; 2024 Mechanical Temp LLC. Secure Payment Portal.</p></footer>
                 </div>
