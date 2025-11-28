@@ -94,6 +94,7 @@
         const Fuel = (p) => <IconWrapper {...p}><path d="M3 22v-8a2 2 0 0 1 2-2h2.5a2 2 0 0 1 2 2v8"/><path d="M15 9a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2Z"/><path d="M14 13h2a2 2 0 0 1 2 2v1a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2v-3.5"/><path d="M3 22h18"/><path d="M10 22V8a2 2 0 0 0-2-2H5.5a2 2 0 0 0-2 2v14"/></IconWrapper>;
         const MessageSquare = (p) => <IconWrapper {...p}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></IconWrapper>;
         const Copy = (p) => <IconWrapper {...p}><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></IconWrapper>;
+        const Upload = (p) => <IconWrapper {...p}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></IconWrapper>;
 
         // --- CONSTANTS ---
         const LOGO_URL = "https://imageview.replit.app/objects/uploads/d16ab63e-1d1e-4b8f-863c-67e66e4894fc";
@@ -408,6 +409,172 @@
                 );
             };
 
+            // --- NEW: BULK IMPORT COMPONENT ---
+            const BulkImport = () => {
+                const [rawText, setRawText] = useState("");
+                const [parsedData, setParsedData] = useState([]);
+                const [status, setStatus] = useState("Pending"); // Default status for imported items
+                const [processing, setProcessing] = useState(false);
+
+                const parseText = () => {
+                    const lines = rawText.split('$');
+                    const results = [];
+                    
+                    // The data is a continuous stream: Name + ID + $Amount
+                    // We split by '$', so each segment ends with the Name+ID for the NEXT item, and starts with the Amount for the CURRENT item.
+                    // This requires a slightly different logic than line-by-line.
+                    
+                    // Regex to find 8-digit Invoice ID at the END of a string
+                    const idRegex = /(\d{8})$/;
+
+                    // Iterate through split segments. 
+                    // Segment 0 contains the first Name + ID.
+                    // Segment 1 starts with Amount 1, then has Name 2 + ID 2.
+                    
+                    for (let i = 0; i < lines.length - 1; i++) {
+                        // Current segment text (cleaning newlines)
+                        let currentSegment = lines[i].replace(/\n/g, ' ').trim();
+                        let nextSegment = lines[i+1].replace(/\n/g, ' ').trim(); // Starts with amount
+
+                        // 1. Extract Amount from the START of nextSegment
+                        // Amounts look like "390.00" or "3,650.00"
+                        const amountMatch = nextSegment.match(/^([0-9,]+\.[0-9]{2})/);
+                        if (!amountMatch) continue;
+                        const amount = parseFloat(amountMatch[1].replace(/,/g, ''));
+
+                        // 2. Extract Invoice ID from the END of currentSegment
+                        // The user data shows IDs like "12458129". Let's look for 8 digits at the end.
+                        const idMatch = currentSegment.match(idRegex);
+                        
+                        if (idMatch) {
+                            const invoiceId = idMatch[1];
+                            // 3. Extract Name (Everything before the ID in currentSegment)
+                            const name = currentSegment.substring(0, idMatch.index).trim();
+                            
+                            // Filter out "Total" lines or junk
+                            if (name && name.toLowerCase() !== "total" && name.length > 2) {
+                                results.push({
+                                    customerName: name,
+                                    invoiceId: invoiceId,
+                                    amount: amount
+                                });
+                            }
+                        }
+                    }
+                    setParsedData(results);
+                };
+
+                const handleUpload = async () => {
+                    if(!confirm(`Create ${parsedData.length} invoices? This might take a moment.`)) return;
+                    setProcessing(true);
+                    
+                    // We need to fetch existing customers to map names to IDs, or create new ones.
+                    const custSnapshot = await getDocs(collection(db, "customers"));
+                    let existingCustomers = custSnapshot.docs.map(d => ({id: d.id, ...d.data()}));
+
+                    for (const item of parsedData) {
+                        try {
+                            // 1. Find or Create Customer
+                            let customerId;
+                            let found = existingCustomers.find(c => c.name.toLowerCase() === item.customerName.toLowerCase());
+                            
+                            if (found) {
+                                customerId = found.id;
+                            } else {
+                                // Create new customer
+                                const newCustRef = await onAddCustomer({
+                                    name: item.customerName,
+                                    email: "", // No email in data
+                                    address: "Imported from List",
+                                    notes: "Bulk Imported"
+                                });
+                                customerId = newCustRef.id;
+                                existingCustomers.push({ id: customerId, name: item.customerName }); // Add to local cache
+                            }
+
+                            // 2. Create Invoice
+                            await onAddInvoice({
+                                id: `INV-${item.invoiceId}`, // Use the ID from the text
+                                customerId: customerId,
+                                date: new Date().toISOString().split('T')[0],
+                                dueDate: "Net 30", // Default
+                                status: status,
+                                items: [{ desc: "Overdue Balance Import", qty: 1, unitPrice: item.amount }],
+                                comments: "Imported via Bulk Tool"
+                            });
+
+                        } catch (e) {
+                            console.error("Error importing item:", item, e);
+                        }
+                    }
+                    setProcessing(false);
+                    setParsedData([]);
+                    setRawText("");
+                    alert("Import Complete!");
+                    setView('dashboard');
+                };
+
+                return (
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4">
+                        <div className="flex items-center gap-2 mb-6 text-gray-900 font-bold text-xl">
+                            <button onClick={() => setView('dashboard')} className="hover:bg-gray-100 p-1 rounded"><ChevronLeft /></button>
+                            <h3>Bulk Data Import</h3>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <p className="text-sm text-gray-600">Paste the raw text block below. The system will auto-detect Customers, Invoice IDs, and Amounts.</p>
+                            <textarea 
+                                className="w-full h-48 p-4 border rounded-lg font-mono text-xs bg-slate-50"
+                                value={rawText}
+                                onChange={e => setRawText(e.target.value)}
+                                placeholder="Paste data here (e.g. Talbots #0028212458129$390.00...)"
+                            ></textarea>
+                            
+                            <div className="flex items-center gap-4">
+                                <button onClick={parseText} className="bg-sky-500 hover:bg-sky-600 text-white px-6 py-2 rounded-lg font-bold">Parse Data</button>
+                                {parsedData.length > 0 && (
+                                    <select value={status} onChange={e => setStatus(e.target.value)} className="p-2 border rounded">
+                                        <option value="Pending">Mark as Pending</option>
+                                        <option value="Overdue">Mark as Overdue</option>
+                                        <option value="Paid">Mark as Paid</option>
+                                    </select>
+                                )}
+                            </div>
+
+                            {parsedData.length > 0 && (
+                                <div className="mt-6">
+                                    <h4 className="font-bold mb-2">Preview ({parsedData.length} items)</h4>
+                                    <div className="max-h-64 overflow-y-auto border rounded-lg">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="bg-slate-100 sticky top-0">
+                                                <tr><th className="p-2">Customer</th><th className="p-2">Invoice ID</th><th className="p-2 text-right">Amount</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                {parsedData.map((row, i) => (
+                                                    <tr key={i} className="border-t">
+                                                        <td className="p-2">{row.customerName}</td>
+                                                        <td className="p-2 font-mono">{row.invoiceId}</td>
+                                                        <td className="p-2 text-right">${row.amount.toFixed(2)}</td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <button 
+                                        onClick={handleUpload} 
+                                        disabled={processing}
+                                        className="w-full mt-4 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold flex items-center justify-center gap-2"
+                                    >
+                                        {processing ? <Loader2 className="animate-spin"/> : <Upload size={20} />}
+                                        {processing ? "Uploading to Database..." : "Confirm & Import to Database"}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            };
+
             const AddCustomerForm = () => {
                 const [form, setForm] = useState({ name: "", email: "", address: "", walletAddress: "", notes: "" });
                 const [saving, setSaving] = useState(false);
@@ -480,7 +647,6 @@
                 const [customerId, setCustomerId] = useState(isEdit ? editingInvoice.customerId : "");
                 const [items, setItems] = useState(isEdit ? editingInvoice.items : [{ desc: "", qty: 1, unitPrice: 0 }]);
                 const [comments, setComments] = useState(isEdit ? (editingInvoice.comments || "") : "");
-                // NEW: Added Due Date State
                 const [dueDate, setDueDate] = useState(isEdit ? (editingInvoice.dueDate || "Due on Receipt") : "Due on Receipt");
                 const [saving, setSaving] = useState(false);
                 
@@ -606,6 +772,7 @@
             if (view === 'edit-customer') return <EditCustomerForm />;
             if (view === 'invoice-form') return <InvoiceForm />;
             if (view === 'settings') return <VaultSettings />;
+            if (view === 'bulk-import') return <BulkImport />; // NEW
 
             // SAFE REVENUE CALCULATION
             const totalRevenue = (invoices || []).reduce((acc, inv) => {
@@ -637,6 +804,7 @@
                     <div className="flex gap-4">
                         <button onClick={() => { setEditingInvoice(null); setView('invoice-form'); }} className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-medium transition shadow-sm"><FileText size={18} /> New Invoice</button>
                         <button onClick={() => setView('view-customers')} className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition"><Users size={18} /> Manage Customers</button>
+                        <button onClick={() => setView('bulk-import')} className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50 transition"><Upload size={18} /> Import Data</button>
                         <button onClick={() => setView('settings')} className="ml-auto flex items-center gap-2 text-slate-500 hover:text-slate-800 font-medium transition"><Settings size={20} /> Vault Settings</button>
                     </div>
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
