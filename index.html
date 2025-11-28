@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mechanical Temp - Secure Payment Portal</title>
+    <title>Mechanical Temp - Payment Portal & Admin</title>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
@@ -14,9 +14,6 @@
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Ethers.js for Blockchain Interaction -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -36,143 +33,83 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
 
-        // --- Icons (Self-Contained) ---
-        // Replacing external lucide script with direct SVG components to prevent "Element type is invalid" errors
+        // --- ICONS ---
         const IconWrapper = ({ children, size = 24, className = "", ...props }) => (
-            <svg 
-                xmlns="http://www.w3.org/2000/svg" 
-                width={size} 
-                height={size} 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className={className}
-                {...props}
-            >
-                {children}
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{children}</svg>
         );
-
-        const CreditCard = (props) => (
-            <IconWrapper {...props}>
-                <rect width="20" height="14" x="2" y="5" rx="2" />
-                <line x1="2" x2="22" y1="10" y2="10" />
-            </IconWrapper>
-        );
-
-        const Wallet = (props) => (
-            <IconWrapper {...props}>
-                <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
-                <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
-            </IconWrapper>
-        );
-
-        const CheckCircle2 = (props) => (
-            <IconWrapper {...props}>
-                <circle cx="12" cy="12" r="10" />
-                <path d="m9 12 2 2 4-4" />
-            </IconWrapper>
-        );
-
-        const Lock = (props) => (
-            <IconWrapper {...props}>
-                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </IconWrapper>
-        );
-
-        const LogOut = (props) => (
-            <IconWrapper {...props}>
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <polyline points="16 17 21 12 16 7" />
-                <line x1="21" x2="9" y1="12" y2="12" />
-            </IconWrapper>
-        );
-
-        const FileText = (props) => (
-            <IconWrapper {...props}>
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                <polyline points="14 2 14 8 20 8" />
-                <line x1="16" x2="8" y1="13" y2="13" />
-                <line x1="16" x2="8" y1="17" y2="17" />
-                <line x1="10" x2="8" y1="9" y2="9" />
-            </IconWrapper>
-        );
-
-        const ArrowRight = (props) => (
-            <IconWrapper {...props}>
-                <path d="M5 12h14" />
-                <path d="m12 5 7 7-7 7" />
-            </IconWrapper>
-        );
-
-        const ShieldCheck = (props) => (
-            <IconWrapper {...props}>
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-                <path d="m9 12 2 2 4-4" />
-            </IconWrapper>
-        );
-
-        const Loader2 = (props) => (
-            <IconWrapper {...props}>
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-            </IconWrapper>
-        );
-
-        const Printer = (props) => (
-            <IconWrapper {...props}>
-                <polyline points="6 9 6 2 18 2 18 9" />
-                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                <rect width="12" height="8" x="6" y="14" />
-            </IconWrapper>
-        );
-
-        const MapPin = (props) => (
-            <IconWrapper {...props}>
-                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                <circle cx="12" cy="10" r="3" />
-            </IconWrapper>
-        );
+        const CreditCard = (p) => <IconWrapper {...p}><rect width="20" height="14" x="2" y="5" rx="2" /><line x1="2" x2="22" y1="10" y2="10" /></IconWrapper>;
+        const CheckCircle2 = (p) => <IconWrapper {...p}><circle cx="12" cy="12" r="10" /><path d="m9 12 2 2 4-4" /></IconWrapper>;
+        const Lock = (p) => <IconWrapper {...p}><rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></IconWrapper>;
+        const LogOut = (p) => <IconWrapper {...p}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" x2="9" y1="12" y2="12" /></IconWrapper>;
+        const ArrowRight = (p) => <IconWrapper {...p}><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></IconWrapper>;
+        const Loader2 = (p) => <IconWrapper {...p}><path d="M21 12a9 9 0 1 1-6.219-8.56" /></IconWrapper>;
+        const Printer = (p) => <IconWrapper {...p}><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect width="12" height="8" x="6" y="14" /></IconWrapper>;
+        const MapPin = (p) => <IconWrapper {...p}><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></IconWrapper>;
+        const Users = (p) => <IconWrapper {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></IconWrapper>;
+        const Plus = (p) => <IconWrapper {...p}><path d="M5 12h14"/><path d="M12 5v14"/></IconWrapper>;
+        const FileText = (p) => <IconWrapper {...p}><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></IconWrapper>;
+        const Trash2 = (p) => <IconWrapper {...p}><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></IconWrapper>;
+        const ChevronLeft = (p) => <IconWrapper {...p}><path d="m15 18-6-6 6-6"/></IconWrapper>;
 
 
-        // --- Configuration ---
-        const WEB3AUTH_CLIENT_ID = "BHF9CqnAVImFVStW0OXLuKvgef28VqIAZ8jyngsS-HSuAiuAsgIra04uPbO7-VZpccAdNt56DAWCDaZDbWP6PEA";
-        const CONTRACT_ADDRESS = "0x468f3CCEBb58E5ebcD6cfdA77750E37ED38D6b73";
-        const CONTRACT_ABI = [
-            {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"FundsWithdrawn","type":"event"},
-            {"anonymous":false,"inputs":[{"indexed":false,"internalType":"string","name":"invoiceId","type":"string"},{"indexed":true,"internalType":"address","name":"customer","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"InvoicePaid","type":"event"},
-            {"inputs":[{"internalType":"string","name":"_invoiceId","type":"string"}],"name":"payInvoice","outputs":[],"stateMutability":"payable","type":"function"},
-            {"inputs":[],"name":"getContractBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
-        ];
-
+        // --- CONFIG & CONSTANTS ---
         const LOGO_URL = "https://imageview.replit.app/objects/uploads/d16ab63e-1d1e-4b8f-863c-67e66e4894fc";
-
-        // --- Mock Data ---
-        const INVOICE_DATA = {
-            id: "INV-2024-001",
-            customer: "Alex Residential",
-            company: "Mechanical Temp LLC",
-            serviceAddress: "123 Maple Street, Detroit, MI 48201",
-            billingAddress: "123 Maple Street, Detroit, MI 48201",
-            date: "Oct 24, 2024",
-            dueDate: "Upon Receipt",
-            items: [
-                { id: 1, desc: "Standard Service Call / Trip Charge", qty: 1, unitPrice: 85.00, total: 85.00 },
-                { id: 2, desc: "Refrigerant Refill (R-410A) - per lb", qty: 2, unitPrice: 75.00, total: 150.00 },
-                { id: 3, desc: "Labor: System Leak Check & Repair", qty: 2, unitPrice: 107.50, total: 215.00 }
-            ],
-            subtotal: 450.00,
-            tax: 0.00,
-            amountUSD: 450.00,
-            amountETH: 0.0001 // Low amount for testing if using real ETH
+        
+        // --- DATA MANAGER (Simulated Database) ---
+        // In a real app, this would be API calls to a backend.
+        const DB = {
+            init: () => {
+                if (!localStorage.getItem('mt_customers')) {
+                    localStorage.setItem('mt_customers', JSON.stringify([
+                        { id: 1, name: "Alex Residential", email: "alex@example.com", address: "123 Maple St, Detroit, MI" },
+                        { id: 2, name: "Grand Office Park", email: "manager@grandoffice.com", address: "400 Business Blvd, Troy, MI" }
+                    ]));
+                }
+                if (!localStorage.getItem('mt_invoices')) {
+                    localStorage.setItem('mt_invoices', JSON.stringify([
+                        { 
+                            id: "INV-2024-001", 
+                            customerId: 1, 
+                            date: "2024-10-24", 
+                            dueDate: "Upon Receipt", 
+                            status: "Pending", 
+                            items: [
+                                { desc: "Service Call", qty: 1, unitPrice: 85.00 },
+                                { desc: "Freon Refill", qty: 2, unitPrice: 75.00 }
+                            ]
+                        }
+                    ]));
+                }
+            },
+            getCustomers: () => JSON.parse(localStorage.getItem('mt_customers') || '[]'),
+            addCustomer: (customer) => {
+                const list = DB.getCustomers();
+                customer.id = Date.now(); // Simple ID generation
+                list.push(customer);
+                localStorage.setItem('mt_customers', JSON.stringify(list));
+                return list;
+            },
+            getInvoices: () => JSON.parse(localStorage.getItem('mt_invoices') || '[]'),
+            addInvoice: (invoice) => {
+                const list = DB.getInvoices();
+                list.push(invoice);
+                localStorage.setItem('mt_invoices', JSON.stringify(list));
+                return list;
+            },
+            updateInvoiceStatus: (id, status) => {
+                const list = DB.getInvoices();
+                const idx = list.findIndex(i => i.id === id);
+                if (idx > -1) {
+                    list[idx].status = status;
+                    localStorage.setItem('mt_invoices', JSON.stringify(list));
+                }
+                return list;
+            }
         };
 
-        // --- Components ---
+        // --- COMPONENTS ---
 
         const Navbar = ({ user, onLogout }) => (
             <nav className="w-full bg-white border-b border-gray-100 px-4 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm no-print">
@@ -183,17 +120,13 @@
                 {user && (
                     <div className="flex items-center gap-4">
                         <div className="hidden md:flex flex-col items-end">
-                            <span className="text-xs text-gray-500">Connected as</span>
+                            <span className="text-xs text-gray-500">{user.isAdmin ? 'Administrator' : 'Customer'}</span>
                             <span className="text-sm font-medium text-gray-900">{user.email}</span>
                         </div>
-                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                            {user.name.charAt(0)}
+                        <div className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-white ${user.isAdmin ? 'bg-purple-600' : 'bg-blue-600'}`}>
+                            {user.isAdmin ? 'A' : user.name.charAt(0)}
                         </div>
-                        <button 
-                            onClick={onLogout}
-                            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-                            title="Logout"
-                        >
+                        <button onClick={onLogout} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Logout">
                             <LogOut size={18} />
                         </button>
                     </div>
@@ -202,20 +135,33 @@
         );
 
         const LoginScreen = ({ onLogin }) => {
-            const [isConnecting, setIsConnecting] = useState(false);
+            const [email, setEmail] = useState("admin@mechanicaltemp.com");
+            const [isLoading, setIsLoading] = useState(false);
+            const [error, setError] = useState("");
 
-            const handleLogin = () => {
-                setIsConnecting(true);
-                // Simulation of Web3Auth Login Flow
-                // In production, this calls web3auth.connect()
+            const handleLogin = (e) => {
+                e.preventDefault();
+                setIsLoading(true);
+                setError("");
+                
                 setTimeout(() => {
-                    onLogin({
-                        name: "Alex Customer",
-                        email: "alex@example.com",
-                        address: "0x71C...9A23",
-                        provider: "google"
-                    });
-                }, 1500);
+                    // 1. Check for Admin
+                    if (email.toLowerCase() === "admin@mechanicaltemp.com") {
+                        onLogin({ email, isAdmin: true, name: "Admin" });
+                        return;
+                    }
+
+                    // 2. Check for Customer
+                    const customers = DB.getCustomers();
+                    const customer = customers.find(c => c.email.toLowerCase() === email.toLowerCase());
+                    
+                    if (customer) {
+                        onLogin({ ...customer, isAdmin: false });
+                    } else {
+                        setError("User not found. Try 'admin@mechanicaltemp.com' or 'alex@example.com'");
+                        setIsLoading(false);
+                    }
+                }, 800);
             };
 
             return (
@@ -225,30 +171,221 @@
                             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
                                 <img src={LOGO_URL} alt="Logo" className="h-12 w-auto" />
                             </div>
-                            <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
-                            <p className="text-blue-100">Secure Payment Portal</p>
+                            <h2 className="text-2xl font-bold text-white mb-2">Portal Login</h2>
+                            <p className="text-blue-100">Mechanical Temp LLC</p>
                         </div>
-                        <div className="p-8 space-y-6">
-                            <div className="text-center space-y-2">
-                                <h3 className="text-gray-900 font-semibold">Sign in to view your invoice</h3>
-                                <p className="text-sm text-gray-500">Secure access via Google (Web3Auth)</p>
+                        
+                        <form onSubmit={handleLogin} className="p-8 space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                                <input 
+                                    type="email" 
+                                    required
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                                    placeholder="Enter your email"
+                                />
                             </div>
+                            
+                            {error && <p className="text-red-500 text-sm">{error}</p>}
+
                             <button
-                                onClick={handleLogin}
-                                disabled={isConnecting}
-                                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-xl transition-all shadow-sm group"
+                                type="submit"
+                                disabled={isLoading}
+                                className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-sm"
                             >
-                                {isConnecting ? <Loader2 className="animate-spin text-blue-600" /> : "Continue with Google"}
+                                {isLoading ? <Loader2 className="animate-spin" /> : "Sign In"}
                             </button>
-                            <div className="flex items-center gap-2 justify-center text-xs text-gray-400 mt-4">
-                                <Lock size={12} />
-                                <span>Secured by Blockchain</span>
+
+                            <div className="bg-gray-50 p-4 rounded text-xs text-gray-500">
+                                <p className="font-bold mb-1">Demo Credentials:</p>
+                                <p>Admin: admin@mechanicaltemp.com</p>
+                                <p>Customer: alex@example.com</p>
                             </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        // --- ADMIN PANEL COMPONENTS ---
+
+        const AdminDashboard = ({ customers, invoices, onAddCustomer, onAddInvoice }) => {
+            const [view, setView] = useState('dashboard'); // dashboard, add-customer, add-invoice
+            
+            // Sub-Components for Admin
+            const AddCustomerForm = () => {
+                const [form, setForm] = useState({ name: "", email: "", address: "" });
+                const handleSubmit = (e) => {
+                    e.preventDefault();
+                    onAddCustomer(form);
+                    setView('dashboard');
+                };
+                return (
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm max-w-lg mx-auto animate-in fade-in slide-in-from-bottom-4">
+                        <div className="flex items-center gap-2 mb-6 text-gray-900 font-bold text-xl">
+                            <button onClick={() => setView('dashboard')} className="hover:bg-gray-100 p-1 rounded"><ChevronLeft /></button>
+                            <h3>Add New Customer</h3>
+                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Customer Name</label>
+                                <input required className="w-full p-2 border rounded" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Email</label>
+                                <input required type="email" className="w-full p-2 border rounded" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Billing Address</label>
+                                <textarea required className="w-full p-2 border rounded" value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
+                            </div>
+                            <button className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold">Save Customer</button>
+                        </form>
+                    </div>
+                );
+            };
+
+            const AddInvoiceForm = () => {
+                const [customerId, setCustomerId] = useState(customers[0]?.id || "");
+                const [items, setItems] = useState([{ desc: "", qty: 1, unitPrice: 0 }]);
+                
+                const addItem = () => setItems([...items, { desc: "", qty: 1, unitPrice: 0 }]);
+                const updateItem = (idx, field, val) => {
+                    const newItems = [...items];
+                    newItems[idx][field] = val;
+                    setItems(newItems);
+                };
+                const removeItem = (idx) => setItems(items.filter((_, i) => i !== idx));
+
+                const handleSubmit = (e) => {
+                    e.preventDefault();
+                    if(!customerId) return alert("Select a customer");
+                    
+                    const newInvoice = {
+                        id: `INV-${Date.now().toString().slice(-6)}`,
+                        customerId: parseInt(customerId),
+                        date: new Date().toISOString().split('T')[0],
+                        dueDate: "Net 30",
+                        status: "Pending",
+                        items: items.map(i => ({...i, unitPrice: parseFloat(i.unitPrice), qty: parseFloat(i.qty)}))
+                    };
+                    onAddInvoice(newInvoice);
+                    setView('dashboard');
+                };
+
+                return (
+                    <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom-4">
+                         <div className="flex items-center gap-2 mb-6 text-gray-900 font-bold text-xl">
+                            <button onClick={() => setView('dashboard')} className="hover:bg-gray-100 p-1 rounded"><ChevronLeft /></button>
+                            <h3>Create Invoice</h3>
+                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700">Select Customer</label>
+                                <select className="w-full p-2 border rounded" value={customerId} onChange={e => setCustomerId(e.target.value)}>
+                                    {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Line Items</label>
+                                {items.map((item, idx) => (
+                                    <div key={idx} className="flex gap-2 mb-2">
+                                        <input placeholder="Description" className="flex-1 p-2 border rounded" value={item.desc} onChange={e => updateItem(idx, 'desc', e.target.value)} required />
+                                        <input type="number" placeholder="Qty" className="w-20 p-2 border rounded" value={item.qty} onChange={e => updateItem(idx, 'qty', e.target.value)} required />
+                                        <input type="number" placeholder="Price" className="w-24 p-2 border rounded" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', e.target.value)} required />
+                                        {items.length > 1 && <button type="button" onClick={() => removeItem(idx)} className="text-red-500 p-2"><Trash2 size={16}/></button>}
+                                    </div>
+                                ))}
+                                <button type="button" onClick={addItem} className="text-sm text-blue-600 font-medium flex items-center gap-1 mt-2">+ Add Item</button>
+                            </div>
+
+                            <div className="bg-gray-50 p-4 rounded text-right">
+                                <span className="text-gray-500 mr-2">Total:</span>
+                                <span className="font-bold text-xl">${items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0).toFixed(2)}</span>
+                            </div>
+
+                            <button className="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold">Generate Invoice</button>
+                        </form>
+                    </div>
+                );
+            };
+
+            // Main Dashboard View
+            if (view === 'add-customer') return <AddCustomerForm />;
+            if (view === 'add-invoice') return <AddInvoiceForm />;
+
+            return (
+                <div className="space-y-8">
+                    {/* Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                            <p className="text-gray-500 text-sm font-medium">Total Revenue</p>
+                            <h3 className="text-2xl font-bold text-gray-900">${invoices.reduce((acc, inv) => acc + inv.items.reduce((s, i) => s + (i.qty * i.unitPrice), 0), 0).toFixed(2)}</h3>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                            <p className="text-gray-500 text-sm font-medium">Total Customers</p>
+                            <h3 className="text-2xl font-bold text-gray-900">{customers.length}</h3>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                            <p className="text-gray-500 text-sm font-medium">Pending Invoices</p>
+                            <h3 className="text-2xl font-bold text-orange-600">{invoices.filter(i => i.status === 'Pending').length}</h3>
+                        </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-4">
+                        <button onClick={() => setView('add-invoice')} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-blue-700 transition">
+                            <FileText size={18} /> New Invoice
+                        </button>
+                        <button onClick={() => setView('add-customer')} className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition">
+                            <Users size={18} /> Add Customer
+                        </button>
+                    </div>
+
+                    {/* Invoice List */}
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 font-bold text-gray-700">All Invoices</div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-gray-50 text-gray-500">
+                                    <tr>
+                                        <th className="px-6 py-3 font-medium">Invoice #</th>
+                                        <th className="px-6 py-3 font-medium">Customer</th>
+                                        <th className="px-6 py-3 font-medium">Date</th>
+                                        <th className="px-6 py-3 font-medium">Amount</th>
+                                        <th className="px-6 py-3 font-medium">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {invoices.map(inv => {
+                                        const cust = customers.find(c => c.id === inv.customerId);
+                                        const total = inv.items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0);
+                                        return (
+                                            <tr key={inv.id} className="hover:bg-gray-50">
+                                                <td className="px-6 py-4 font-mono text-gray-600">{inv.id}</td>
+                                                <td className="px-6 py-4 font-medium">{cust ? cust.name : 'Unknown'}</td>
+                                                <td className="px-6 py-4 text-gray-500">{inv.date}</td>
+                                                <td className="px-6 py-4 font-medium">${total.toFixed(2)}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-bold ${inv.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                        {inv.status}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
             );
         };
+
+        // --- CUSTOMER PORTAL COMPONENTS ---
 
         const MoonPayWidget = ({ amount, onClose, onComplete }) => {
             const [step, setStep] = useState('loading');
@@ -260,9 +397,8 @@
 
             const handlePay = () => {
                 setStep('processing');
-                // Simulate processing time
                 setTimeout(() => {
-                    onComplete("0xMoonPayTxHash...");
+                    onComplete("0x" + Math.random().toString(16).substr(2, 40)); // Mock Hash
                 }, 3000);
             };
 
@@ -322,240 +458,225 @@
             );
         };
 
-        const SuccessScreen = ({ txHash }) => (
-            <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-8">
-                <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 text-green-600 shadow-sm">
-                    <CheckCircle2 size={48} />
-                </div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
-                <p className="text-gray-500 max-w-md mb-8">
-                    Transaction recorded on blockchain. A receipt has been emailed to you.
-                </p>
-                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 w-full max-w-sm text-left mb-8">
-                    <div className="flex justify-between text-sm mb-2">
-                        <span className="text-gray-500">Tx Hash</span>
-                        <span className="text-blue-600 font-mono text-xs bg-blue-50 px-2 py-0.5 rounded">{txHash.substring(0,16)}...</span>
+        const InvoiceDetail = ({ invoice, customer, onBack, onPaymentSuccess }) => {
+            const [showMoonPay, setShowMoonPay] = useState(false);
+            const totalAmount = invoice.items.reduce((acc, item) => acc + (item.qty * item.unitPrice), 0);
+            
+            if (invoice.status === 'Paid') {
+                return (
+                    <div className="max-w-xl mx-auto text-center py-12">
+                        <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600">
+                            <CheckCircle2 size={48} />
+                        </div>
+                        <h2 className="text-3xl font-bold text-gray-900 mb-2">Invoice Paid</h2>
+                        <p className="text-gray-500 mb-8">This invoice has been settled. Thank you for your business.</p>
+                        <button onClick={onBack} className="text-blue-600 hover:underline">Back to Invoices</button>
                     </div>
-                    <div className="flex justify-between text-sm">
-                        <span className="text-gray-500">Status</span>
-                        <span className="text-green-600 font-medium flex items-center gap-1">Confirmed <CheckCircle2 size={12} /></span>
-                    </div>
-                </div>
-                <button onClick={() => window.location.reload()} className="text-blue-600 font-medium hover:underline">
-                    Back to Dashboard
-                </button>
-            </div>
-        );
-
-        const InvoiceDashboard = ({ user }) => {
-            const [isMoonPayOpen, setMoonPayOpen] = useState(false);
-            const [paymentComplete, setPaymentComplete] = useState(false);
-            const [txHash, setTxHash] = useState("");
-            const [selectedMethod, setSelectedMethod] = useState('moonpay');
-            const [isCryptoProcessing, setIsCryptoProcessing] = useState(false);
-
-            // Handle standard print
-            const handlePrint = () => window.print();
-
-            // Handle Crypto Payment (Direct Contract Call)
-            const handleCryptoPay = async () => {
-                if (!window.ethereum) {
-                    alert("No crypto wallet found. Please use MoonPay or install Metamask.");
-                    return;
-                }
-                
-                setIsCryptoProcessing(true);
-                try {
-                    const provider = new ethers.providers.Web3Provider(window.ethereum);
-                    await provider.send("eth_requestAccounts", []); // Request access
-                    const signer = provider.getSigner();
-                    
-                    // Create Contract Instance
-                    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-                    
-                    // Call payInvoice
-                    const tx = await contract.payInvoice(INVOICE_DATA.id, {
-                        value: ethers.utils.parseEther(INVOICE_DATA.amountETH.toString())
-                    });
-                    
-                    console.log("Tx Sent:", tx.hash);
-                    await tx.wait(); // Wait for confirmation
-                    
-                    setTxHash(tx.hash);
-                    setPaymentComplete(true);
-                } catch (error) {
-                    console.error(error);
-                    alert("Payment failed or rejected: " + (error.reason || error.message));
-                } finally {
-                    setIsCryptoProcessing(false);
-                }
-            };
-
-            const handleMoonPayComplete = (hash) => {
-                setTxHash(hash);
-                setMoonPayOpen(false);
-                setPaymentComplete(true);
-            };
-
-            if (paymentComplete) return <SuccessScreen txHash={txHash} />;
+                );
+            }
 
             return (
-                <div className="container mx-auto max-w-5xl p-4 md:p-8">
-                    <div className="flex flex-col lg:flex-row gap-8">
-                        {/* INVOICE SECTION */}
-                        <div className="flex-1 space-y-6">
-                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 print:shadow-none print:border-none print:p-0">
-                                {/* Header */}
-                                <div className="flex justify-between items-start mb-8 pb-8 border-b border-gray-100">
-                                    <div>
-                                        <img src={LOGO_URL} alt="Logo" className="h-12 w-auto mb-4 object-contain" />
-                                        <h1 className="text-2xl font-bold text-gray-900">INVOICE</h1>
-                                        <p className="text-gray-500 mt-1">{INVOICE_DATA.id}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <button onClick={handlePrint} className="no-print inline-flex items-center gap-2 text-sm text-blue-600 font-medium hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
-                                            <Printer size={16} /> Print / Save PDF
-                                        </button>
-                                        <div className="mt-4 text-right">
-                                            <p className="text-sm font-bold text-gray-400 uppercase tracking-wider">Status</p>
-                                            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 mt-1">
-                                                Unpaid
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Address Block */}
-                                <div className="grid md:grid-cols-2 gap-8 mb-8">
-                                    <div>
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Bill To</p>
-                                        <p className="font-bold text-gray-900">{INVOICE_DATA.customer}</p>
-                                        <p className="text-gray-500 text-sm mt-1">{INVOICE_DATA.billingAddress}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Service Location</p>
-                                        <div className="flex items-start gap-2">
-                                            <MapPin size={16} className="text-gray-400 mt-0.5" />
-                                            <div>
-                                                <p className="font-medium text-gray-900">{INVOICE_DATA.serviceAddress}</p>
-                                                <p className="text-xs text-gray-500 mt-1">Tech: Mike S.</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Items Table */}
-                                <div className="border border-gray-100 rounded-lg overflow-hidden mb-8">
-                                    <table className="w-full text-sm text-left">
-                                        <thead className="bg-gray-50 text-gray-500 font-medium">
-                                            <tr>
-                                                <th className="px-4 py-3">Description</th>
-                                                <th className="px-4 py-3 text-center">Qty</th>
-                                                <th className="px-4 py-3 text-right">Price</th>
-                                                <th className="px-4 py-3 text-right">Total</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {INVOICE_DATA.items.map((item) => (
-                                                <tr key={item.id}>
-                                                    <td className="px-4 py-4 font-medium text-gray-900">{item.desc}</td>
-                                                    <td className="px-4 py-4 text-center text-gray-500">{item.qty}</td>
-                                                    <td className="px-4 py-4 text-right text-gray-500">${item.unitPrice.toFixed(2)}</td>
-                                                    <td className="px-4 py-4 text-right text-gray-900 font-medium">${item.total.toFixed(2)}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {/* Totals */}
-                                <div className="flex justify-end border-t border-gray-100 pt-6">
-                                    <div className="w-48 space-y-3">
-                                        <div className="flex justify-between text-sm text-gray-500">
-                                            <span>Subtotal</span>
-                                            <span>${INVOICE_DATA.subtotal.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-lg font-bold text-gray-900 pt-3 border-t border-gray-100">
-                                            <span>Total Due</span>
-                                            <span>${INVOICE_DATA.amountUSD.toFixed(2)}</span>
-                                        </div>
+                <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in slide-in-from-bottom-4">
+                    {/* Invoice View */}
+                    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                        <div className="flex justify-between items-start mb-8 pb-8 border-b border-gray-100">
+                            <div>
+                                <button onClick={onBack} className="mb-4 text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 no-print"><ChevronLeft size={16}/> Back</button>
+                                <img src={LOGO_URL} alt="Logo" className="h-12 w-auto mb-4 object-contain" />
+                                <h1 className="text-2xl font-bold text-gray-900">INVOICE</h1>
+                                <p className="text-gray-500 mt-1">{invoice.id}</p>
+                            </div>
+                            <div className="text-right">
+                                <button onClick={() => window.print()} className="no-print inline-flex items-center gap-2 text-sm text-blue-600 font-medium hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
+                                    <Printer size={16} /> Print / PDF
+                                </button>
+                                <div className="mt-4">
+                                    <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                                        Unpaid
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* PAYMENT SECTION */}
-                        <div className="w-full lg:w-[380px] no-print">
-                            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-24">
-                                <h3 className="font-bold text-gray-900 mb-4">Select Payment Method</h3>
-                                <div className="space-y-3 mb-6">
-                                    {/* MoonPay Option */}
-                                    <div 
-                                        onClick={() => setSelectedMethod('moonpay')}
-                                        className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedMethod === 'moonpay' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-100 bg-white'}`}
-                                    >
-                                        <span className="absolute -top-3 right-4 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide">Recommended</span>
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${selectedMethod === 'moonpay' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                                                <CreditCard size={20} />
-                                            </div>
-                                            <div>
-                                                <p className="font-semibold text-gray-900">Credit Card (MoonPay)</p>
-                                                <p className="text-xs text-gray-500">Visa / Mastercard</p>
-                                            </div>
-                                            {selectedMethod === 'moonpay' && <CheckCircle2 size={20} className="ml-auto text-blue-600" />}
-                                        </div>
-                                    </div>
+                        <div className="grid md:grid-cols-2 gap-8 mb-8">
+                            <div>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Bill To</p>
+                                <p className="font-bold text-gray-900">{customer.name}</p>
+                                <p className="text-gray-500 text-sm mt-1">{customer.address}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Details</p>
+                                <p className="text-sm"><span className="text-gray-500">Date:</span> {invoice.date}</p>
+                                <p className="text-sm"><span className="text-gray-500">Due:</span> {invoice.dueDate}</p>
+                            </div>
+                        </div>
 
-                                    {/* Crypto Wallet Option */}
-                                    <div 
-                                        onClick={() => setSelectedMethod('crypto')}
-                                        className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedMethod === 'crypto' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-100 bg-white'}`}
-                                    >
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-lg ${selectedMethod === 'crypto' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
-                                                <Wallet size={20} />
-                                            </div>
-                                            <div>
-                                                <p className="font-semibold text-gray-900">Crypto Wallet</p>
-                                                <p className="text-xs text-gray-500">Metamask / WalletConnect</p>
-                                            </div>
-                                            {selectedMethod === 'crypto' && <CheckCircle2 size={20} className="ml-auto text-blue-600" />}
-                                        </div>
-                                    </div>
-                                </div>
+                        <table className="w-full text-sm text-left mb-8">
+                            <thead className="bg-gray-50 text-gray-500 font-medium">
+                                <tr>
+                                    <th className="px-4 py-3">Description</th>
+                                    <th className="px-4 py-3 text-center">Qty</th>
+                                    <th className="px-4 py-3 text-right">Price</th>
+                                    <th className="px-4 py-3 text-right">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {invoice.items.map((item, i) => (
+                                    <tr key={i}>
+                                        <td className="px-4 py-4">{item.desc}</td>
+                                        <td className="px-4 py-4 text-center">{item.qty}</td>
+                                        <td className="px-4 py-4 text-right">${item.unitPrice.toFixed(2)}</td>
+                                        <td className="px-4 py-4 text-right font-medium">${(item.qty * item.unitPrice).toFixed(2)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
 
-                                <button
-                                    onClick={() => selectedMethod === 'moonpay' ? setMoonPayOpen(true) : handleCryptoPay()}
-                                    disabled={isCryptoProcessing}
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-colors flex items-center justify-center gap-2 group shadow-lg shadow-blue-200"
-                                >
-                                    {isCryptoProcessing ? <Loader2 className="animate-spin" /> : <span>Pay ${INVOICE_DATA.amountUSD.toFixed(2)}</span>}
-                                    {!isCryptoProcessing && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
-                                </button>
-                                
-                                <p className="text-center text-xs text-gray-400 mt-4">
-                                    Secure payments powered by Web3 & Blockchain.
-                                </p>
+                        <div className="flex justify-end border-t border-gray-100 pt-6">
+                            <div className="w-48 flex justify-between items-center text-lg font-bold text-gray-900">
+                                <span>Total Due</span>
+                                <span>${totalAmount.toFixed(2)}</span>
                             </div>
                         </div>
                     </div>
-                    {isMoonPayOpen && <MoonPayWidget amount={INVOICE_DATA.amountUSD} onClose={() => setMoonPayOpen(false)} onComplete={handleMoonPayComplete} />}
+
+                    {/* Payment Sidebar */}
+                    <div className="w-full lg:w-[380px] no-print">
+                        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-24">
+                            <h3 className="font-bold text-gray-900 mb-4">Payment Method</h3>
+                            <div className="p-4 rounded-xl border-2 border-blue-600 bg-blue-50/50 cursor-pointer mb-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-blue-600 text-white p-2 rounded-lg"><CreditCard size={20} /></div>
+                                    <div>
+                                        <p className="font-semibold text-blue-900">Credit Card</p>
+                                        <p className="text-xs text-gray-500">via MoonPay Secure Checkout</p>
+                                    </div>
+                                    <CheckCircle2 size={20} className="ml-auto text-blue-600" />
+                                </div>
+                            </div>
+                            <button onClick={() => setShowMoonPay(true)} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02]">
+                                Pay ${totalAmount.toFixed(2)}
+                            </button>
+                            <div className="flex items-center justify-center gap-2 mt-4 text-xs text-gray-400">
+                                <Lock size={12}/> 256-bit Encrypted
+                            </div>
+                        </div>
+                    </div>
+                    {showMoonPay && <MoonPayWidget amount={totalAmount} onClose={() => setShowMoonPay(false)} onComplete={() => { setShowMoonPay(false); onPaymentSuccess(); }} />}
                 </div>
             );
         };
 
+        const CustomerDashboard = ({ user, invoices, onUpdateStatus }) => {
+            const [selectedInvoice, setSelectedInvoice] = useState(null);
+            
+            // Filter invoices for this customer only
+            const myInvoices = invoices.filter(i => i.customerId === user.id);
+
+            if (selectedInvoice) {
+                return (
+                    <InvoiceDetail 
+                        invoice={selectedInvoice} 
+                        customer={user} 
+                        onBack={() => setSelectedInvoice(null)} 
+                        onPaymentSuccess={() => {
+                            onUpdateStatus(selectedInvoice.id, 'Paid');
+                            setSelectedInvoice({...selectedInvoice, status: 'Paid'});
+                        }}
+                    />
+                );
+            }
+
+            return (
+                <div className="max-w-4xl mx-auto">
+                    <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Invoices</h2>
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        {myInvoices.length === 0 ? (
+                            <div className="p-8 text-center text-gray-500">No invoices found.</div>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-gray-50 text-gray-500 text-sm">
+                                        <tr>
+                                            <th className="px-6 py-4 font-medium">Invoice #</th>
+                                            <th className="px-6 py-4 font-medium">Date</th>
+                                            <th className="px-6 py-4 font-medium">Due</th>
+                                            <th className="px-6 py-4 font-medium">Total</th>
+                                            <th className="px-6 py-4 font-medium">Status</th>
+                                            <th className="px-6 py-4"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {myInvoices.map(inv => {
+                                            const total = inv.items.reduce((acc, i) => acc + (i.qty * i.unitPrice), 0);
+                                            return (
+                                                <tr key={inv.id} className="hover:bg-gray-50">
+                                                    <td className="px-6 py-4 font-mono text-gray-600">{inv.id}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{inv.date}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{inv.dueDate}</td>
+                                                    <td className="px-6 py-4 font-medium text-gray-900">${total.toFixed(2)}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${inv.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                            {inv.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button onClick={() => setSelectedInvoice(inv)} className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1">
+                                                            View <ArrowRight size={14} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        // --- MAIN APP SHELL ---
         const App = () => {
             const [user, setUser] = useState(null);
-            
+            const [dataTick, setDataTick] = useState(0); // Trigger re-render when data updates
+
+            // Init Database Simulation
+            useEffect(() => { DB.init(); }, []);
+
+            const handleAddCustomer = (c) => { DB.addCustomer(c); setDataTick(t => t+1); };
+            const handleAddInvoice = (i) => { DB.addInvoice(i); setDataTick(t => t+1); };
+            const handleUpdateStatus = (id, s) => { DB.updateInvoiceStatus(id, s); setDataTick(t => t+1); };
+
+            const customers = DB.getCustomers();
+            const invoices = DB.getInvoices();
+
             return (
-                <div className="min-h-screen">
+                <div className="min-h-screen pb-12">
                     <Navbar user={user} onLogout={() => setUser(null)} />
-                    <main className="pb-12 print:pb-0">
-                        {!user ? <LoginScreen onLogin={setUser} /> : <InvoiceDashboard user={user} />}
+                    
+                    <main className="container mx-auto px-4 py-8">
+                        {!user ? (
+                            <LoginScreen onLogin={setUser} />
+                        ) : user.isAdmin ? (
+                            <AdminDashboard 
+                                customers={customers} 
+                                invoices={invoices} 
+                                onAddCustomer={handleAddCustomer}
+                                onAddInvoice={handleAddInvoice}
+                            />
+                        ) : (
+                            <CustomerDashboard 
+                                user={user} 
+                                invoices={invoices}
+                                onUpdateStatus={handleUpdateStatus}
+                            />
+                        )}
                     </main>
-                    <footer className="border-t border-gray-200 bg-white py-8 text-center text-sm text-gray-400 no-print">
-                        <p>&copy; 2024 Mechanical Temp. All rights reserved.</p>
+
+                    <footer className="text-center text-sm text-gray-400 py-8 no-print">
+                        <p>&copy; 2024 Mechanical Temp LLC. Secure Payment Portal.</p>
                     </footer>
                 </div>
             );
