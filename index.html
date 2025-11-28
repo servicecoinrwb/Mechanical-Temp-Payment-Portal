@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mechanical Temp - Secure Payment Portal</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Ethers.js for Blockchain Interaction -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Print Styles */
+        @media print {
+            .no-print { display: none !important; }
+            .print-only { display: block !important; }
+            body { background: white; }
+            .shadow-sm, .shadow-lg, .shadow-2xl { box-shadow: none !important; }
+            .border { border: 1px solid #ddd !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-gray-800">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- Icons (Self-Contained) ---
+        // Replacing external lucide script with direct SVG components to prevent "Element type is invalid" errors
+        const IconWrapper = ({ children, size = 24, className = "", ...props }) => (
+            <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width={size} 
+                height={size} 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                className={className}
+                {...props}
+            >
+                {children}
+            </svg>
+        );
+
+        const CreditCard = (props) => (
+            <IconWrapper {...props}>
+                <rect width="20" height="14" x="2" y="5" rx="2" />
+                <line x1="2" x2="22" y1="10" y2="10" />
+            </IconWrapper>
+        );
+
+        const Wallet = (props) => (
+            <IconWrapper {...props}>
+                <path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1" />
+                <path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4" />
+            </IconWrapper>
+        );
+
+        const CheckCircle2 = (props) => (
+            <IconWrapper {...props}>
+                <circle cx="12" cy="12" r="10" />
+                <path d="m9 12 2 2 4-4" />
+            </IconWrapper>
+        );
+
+        const Lock = (props) => (
+            <IconWrapper {...props}>
+                <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </IconWrapper>
+        );
+
+        const LogOut = (props) => (
+            <IconWrapper {...props}>
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" x2="9" y1="12" y2="12" />
+            </IconWrapper>
+        );
+
+        const FileText = (props) => (
+            <IconWrapper {...props}>
+                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" x2="8" y1="13" y2="13" />
+                <line x1="16" x2="8" y1="17" y2="17" />
+                <line x1="10" x2="8" y1="9" y2="9" />
+            </IconWrapper>
+        );
+
+        const ArrowRight = (props) => (
+            <IconWrapper {...props}>
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+            </IconWrapper>
+        );
+
+        const ShieldCheck = (props) => (
+            <IconWrapper {...props}>
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+                <path d="m9 12 2 2 4-4" />
+            </IconWrapper>
+        );
+
+        const Loader2 = (props) => (
+            <IconWrapper {...props}>
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </IconWrapper>
+        );
+
+        const Printer = (props) => (
+            <IconWrapper {...props}>
+                <polyline points="6 9 6 2 18 2 18 9" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <rect width="12" height="8" x="6" y="14" />
+            </IconWrapper>
+        );
+
+        const MapPin = (props) => (
+            <IconWrapper {...props}>
+                <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                <circle cx="12" cy="10" r="3" />
+            </IconWrapper>
+        );
+
+
+        // --- Configuration ---
+        const WEB3AUTH_CLIENT_ID = "BHF9CqnAVImFVStW0OXLuKvgef28VqIAZ8jyngsS-HSuAiuAsgIra04uPbO7-VZpccAdNt56DAWCDaZDbWP6PEA";
+        const CONTRACT_ADDRESS = "0x468f3CCEBb58E5ebcD6cfdA77750E37ED38D6b73";
+        const CONTRACT_ABI = [
+            {"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"}],"name":"FundsWithdrawn","type":"event"},
+            {"anonymous":false,"inputs":[{"indexed":false,"internalType":"string","name":"invoiceId","type":"string"},{"indexed":true,"internalType":"address","name":"customer","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"timestamp","type":"uint256"}],"name":"InvoicePaid","type":"event"},
+            {"inputs":[{"internalType":"string","name":"_invoiceId","type":"string"}],"name":"payInvoice","outputs":[],"stateMutability":"payable","type":"function"},
+            {"inputs":[],"name":"getContractBalance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+        ];
+
+        const LOGO_URL = "https://imageview.replit.app/objects/uploads/d16ab63e-1d1e-4b8f-863c-67e66e4894fc";
+
+        // --- Mock Data ---
+        const INVOICE_DATA = {
+            id: "INV-2024-001",
+            customer: "Alex Residential",
+            company: "Mechanical Temp LLC",
+            serviceAddress: "123 Maple Street, Detroit, MI 48201",
+            billingAddress: "123 Maple Street, Detroit, MI 48201",
+            date: "Oct 24, 2024",
+            dueDate: "Upon Receipt",
+            items: [
+                { id: 1, desc: "Standard Service Call / Trip Charge", qty: 1, unitPrice: 85.00, total: 85.00 },
+                { id: 2, desc: "Refrigerant Refill (R-410A) - per lb", qty: 2, unitPrice: 75.00, total: 150.00 },
+                { id: 3, desc: "Labor: System Leak Check & Repair", qty: 2, unitPrice: 107.50, total: 215.00 }
+            ],
+            subtotal: 450.00,
+            tax: 0.00,
+            amountUSD: 450.00,
+            amountETH: 0.0001 // Low amount for testing if using real ETH
+        };
+
+        // --- Components ---
+
+        const Navbar = ({ user, onLogout }) => (
+            <nav className="w-full bg-white border-b border-gray-100 px-4 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm no-print">
+                <div className="flex items-center gap-3">
+                    <img src={LOGO_URL} alt="Mechanical Temp Logo" className="h-10 w-auto object-contain" />
+                    <span className="font-bold text-gray-800 text-lg hidden sm:block">Mechanical Temp</span>
+                </div>
+                {user && (
+                    <div className="flex items-center gap-4">
+                        <div className="hidden md:flex flex-col items-end">
+                            <span className="text-xs text-gray-500">Connected as</span>
+                            <span className="text-sm font-medium text-gray-900">{user.email}</span>
+                        </div>
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                            {user.name.charAt(0)}
+                        </div>
+                        <button 
+                            onClick={onLogout}
+                            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                            title="Logout"
+                        >
+                            <LogOut size={18} />
+                        </button>
+                    </div>
+                )}
+            </nav>
+        );
+
+        const LoginScreen = ({ onLogin }) => {
+            const [isConnecting, setIsConnecting] = useState(false);
+
+            const handleLogin = () => {
+                setIsConnecting(true);
+                // Simulation of Web3Auth Login Flow
+                // In production, this calls web3auth.connect()
+                setTimeout(() => {
+                    onLogin({
+                        name: "Alex Customer",
+                        email: "alex@example.com",
+                        address: "0x71C...9A23",
+                        provider: "google"
+                    });
+                }, 1500);
+            };
+
+            return (
+                <div className="min-h-[80vh] flex flex-col items-center justify-center p-4">
+                    <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+                        <div className="bg-blue-600 p-8 text-center">
+                            <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                                <img src={LOGO_URL} alt="Logo" className="h-12 w-auto" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-white mb-2">Welcome Back</h2>
+                            <p className="text-blue-100">Secure Payment Portal</p>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            <div className="text-center space-y-2">
+                                <h3 className="text-gray-900 font-semibold">Sign in to view your invoice</h3>
+                                <p className="text-sm text-gray-500">Secure access via Google (Web3Auth)</p>
+                            </div>
+                            <button
+                                onClick={handleLogin}
+                                disabled={isConnecting}
+                                className="w-full flex items-center justify-center gap-3 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-3 px-4 rounded-xl transition-all shadow-sm group"
+                            >
+                                {isConnecting ? <Loader2 className="animate-spin text-blue-600" /> : "Continue with Google"}
+                            </button>
+                            <div className="flex items-center gap-2 justify-center text-xs text-gray-400 mt-4">
+                                <Lock size={12} />
+                                <span>Secured by Blockchain</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const MoonPayWidget = ({ amount, onClose, onComplete }) => {
+            const [step, setStep] = useState('loading');
+
+            useEffect(() => {
+                const timer = setTimeout(() => setStep('form'), 1500);
+                return () => clearTimeout(timer);
+            }, []);
+
+            const handlePay = () => {
+                setStep('processing');
+                // Simulate processing time
+                setTimeout(() => {
+                    onComplete("0xMoonPayTxHash...");
+                }, 3000);
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                        <div className="bg-[#7D00FF] p-4 flex justify-between items-center text-white">
+                            <span className="font-bold tracking-tight">MoonPay</span>
+                            <button onClick={onClose} className="hover:bg-white/20 p-1 rounded">✕</button>
+                        </div>
+                        <div className="p-6 flex-1 overflow-y-auto min-h-[400px] flex flex-col relative">
+                            {step === 'loading' && (
+                                <div className="flex-1 flex flex-col items-center justify-center space-y-4">
+                                    <Loader2 className="w-8 h-8 text-[#7D00FF] animate-spin" />
+                                    <p className="text-gray-500 text-sm">Securely connecting...</p>
+                                </div>
+                            )}
+                            {step === 'form' && (
+                                <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
+                                    <div className="text-center mb-6">
+                                        <p className="text-gray-500 text-sm">Total Due</p>
+                                        <div className="text-3xl font-bold text-gray-900">${amount.toFixed(2)}</div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div className="border border-gray-200 rounded-lg p-3 flex items-center gap-3 border-[#7D00FF] bg-purple-50">
+                                            <div className="w-10 h-6 bg-blue-800 rounded flex items-center justify-center text-white text-[10px] font-bold">VISA</div>
+                                            <div className="flex-1">
+                                                <div className="text-sm font-medium">Visa ending in 4242</div>
+                                                <div className="text-xs text-gray-400">Expires 12/25</div>
+                                            </div>
+                                            <div className="w-4 h-4 rounded-full bg-[#7D00FF]"></div>
+                                        </div>
+                                        <div className="pt-4 border-t border-gray-100">
+                                            <div className="flex justify-between text-sm font-medium">
+                                                <span className="text-gray-900">Total Charge</span>
+                                                <span className="text-[#7D00FF]">${(amount + 2.45).toFixed(2)}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={handlePay} className="w-full mt-6 bg-[#7D00FF] hover:bg-[#6a00d8] text-white font-bold py-4 rounded-full shadow-lg">
+                                        Pay Now
+                                    </button>
+                                </div>
+                            )}
+                            {step === 'processing' && (
+                                <div className="flex-1 flex flex-col items-center justify-center text-center space-y-6">
+                                    <Loader2 className="w-8 h-8 text-[#7D00FF] animate-spin" />
+                                    <div>
+                                        <h3 className="text-lg font-bold text-gray-900">Processing</h3>
+                                        <p className="text-gray-500 text-sm mt-1">Confirming transaction...</p>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const SuccessScreen = ({ txHash }) => (
+            <div className="min-h-[60vh] flex flex-col items-center justify-center text-center p-8">
+                <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 text-green-600 shadow-sm">
+                    <CheckCircle2 size={48} />
+                </div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
+                <p className="text-gray-500 max-w-md mb-8">
+                    Transaction recorded on blockchain. A receipt has been emailed to you.
+                </p>
+                <div className="bg-gray-50 p-4 rounded-xl border border-gray-200 w-full max-w-sm text-left mb-8">
+                    <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-500">Tx Hash</span>
+                        <span className="text-blue-600 font-mono text-xs bg-blue-50 px-2 py-0.5 rounded">{txHash.substring(0,16)}...</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                        <span className="text-gray-500">Status</span>
+                        <span className="text-green-600 font-medium flex items-center gap-1">Confirmed <CheckCircle2 size={12} /></span>
+                    </div>
+                </div>
+                <button onClick={() => window.location.reload()} className="text-blue-600 font-medium hover:underline">
+                    Back to Dashboard
+                </button>
+            </div>
+        );
+
+        const InvoiceDashboard = ({ user }) => {
+            const [isMoonPayOpen, setMoonPayOpen] = useState(false);
+            const [paymentComplete, setPaymentComplete] = useState(false);
+            const [txHash, setTxHash] = useState("");
+            const [selectedMethod, setSelectedMethod] = useState('moonpay');
+            const [isCryptoProcessing, setIsCryptoProcessing] = useState(false);
+
+            // Handle standard print
+            const handlePrint = () => window.print();
+
+            // Handle Crypto Payment (Direct Contract Call)
+            const handleCryptoPay = async () => {
+                if (!window.ethereum) {
+                    alert("No crypto wallet found. Please use MoonPay or install Metamask.");
+                    return;
+                }
+                
+                setIsCryptoProcessing(true);
+                try {
+                    const provider = new ethers.providers.Web3Provider(window.ethereum);
+                    await provider.send("eth_requestAccounts", []); // Request access
+                    const signer = provider.getSigner();
+                    
+                    // Create Contract Instance
+                    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+                    
+                    // Call payInvoice
+                    const tx = await contract.payInvoice(INVOICE_DATA.id, {
+                        value: ethers.utils.parseEther(INVOICE_DATA.amountETH.toString())
+                    });
+                    
+                    console.log("Tx Sent:", tx.hash);
+                    await tx.wait(); // Wait for confirmation
+                    
+                    setTxHash(tx.hash);
+                    setPaymentComplete(true);
+                } catch (error) {
+                    console.error(error);
+                    alert("Payment failed or rejected: " + (error.reason || error.message));
+                } finally {
+                    setIsCryptoProcessing(false);
+                }
+            };
+
+            const handleMoonPayComplete = (hash) => {
+                setTxHash(hash);
+                setMoonPayOpen(false);
+                setPaymentComplete(true);
+            };
+
+            if (paymentComplete) return <SuccessScreen txHash={txHash} />;
+
+            return (
+                <div className="container mx-auto max-w-5xl p-4 md:p-8">
+                    <div className="flex flex-col lg:flex-row gap-8">
+                        {/* INVOICE SECTION */}
+                        <div className="flex-1 space-y-6">
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 print:shadow-none print:border-none print:p-0">
+                                {/* Header */}
+                                <div className="flex justify-between items-start mb-8 pb-8 border-b border-gray-100">
+                                    <div>
+                                        <img src={LOGO_URL} alt="Logo" className="h-12 w-auto mb-4 object-contain" />
+                                        <h1 className="text-2xl font-bold text-gray-900">INVOICE</h1>
+                                        <p className="text-gray-500 mt-1">{INVOICE_DATA.id}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <button onClick={handlePrint} className="no-print inline-flex items-center gap-2 text-sm text-blue-600 font-medium hover:text-blue-700 bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
+                                            <Printer size={16} /> Print / Save PDF
+                                        </button>
+                                        <div className="mt-4 text-right">
+                                            <p className="text-sm font-bold text-gray-400 uppercase tracking-wider">Status</p>
+                                            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 mt-1">
+                                                Unpaid
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Address Block */}
+                                <div className="grid md:grid-cols-2 gap-8 mb-8">
+                                    <div>
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Bill To</p>
+                                        <p className="font-bold text-gray-900">{INVOICE_DATA.customer}</p>
+                                        <p className="text-gray-500 text-sm mt-1">{INVOICE_DATA.billingAddress}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Service Location</p>
+                                        <div className="flex items-start gap-2">
+                                            <MapPin size={16} className="text-gray-400 mt-0.5" />
+                                            <div>
+                                                <p className="font-medium text-gray-900">{INVOICE_DATA.serviceAddress}</p>
+                                                <p className="text-xs text-gray-500 mt-1">Tech: Mike S.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Items Table */}
+                                <div className="border border-gray-100 rounded-lg overflow-hidden mb-8">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-gray-50 text-gray-500 font-medium">
+                                            <tr>
+                                                <th className="px-4 py-3">Description</th>
+                                                <th className="px-4 py-3 text-center">Qty</th>
+                                                <th className="px-4 py-3 text-right">Price</th>
+                                                <th className="px-4 py-3 text-right">Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {INVOICE_DATA.items.map((item) => (
+                                                <tr key={item.id}>
+                                                    <td className="px-4 py-4 font-medium text-gray-900">{item.desc}</td>
+                                                    <td className="px-4 py-4 text-center text-gray-500">{item.qty}</td>
+                                                    <td className="px-4 py-4 text-right text-gray-500">${item.unitPrice.toFixed(2)}</td>
+                                                    <td className="px-4 py-4 text-right text-gray-900 font-medium">${item.total.toFixed(2)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* Totals */}
+                                <div className="flex justify-end border-t border-gray-100 pt-6">
+                                    <div className="w-48 space-y-3">
+                                        <div className="flex justify-between text-sm text-gray-500">
+                                            <span>Subtotal</span>
+                                            <span>${INVOICE_DATA.subtotal.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-lg font-bold text-gray-900 pt-3 border-t border-gray-100">
+                                            <span>Total Due</span>
+                                            <span>${INVOICE_DATA.amountUSD.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* PAYMENT SECTION */}
+                        <div className="w-full lg:w-[380px] no-print">
+                            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-24">
+                                <h3 className="font-bold text-gray-900 mb-4">Select Payment Method</h3>
+                                <div className="space-y-3 mb-6">
+                                    {/* MoonPay Option */}
+                                    <div 
+                                        onClick={() => setSelectedMethod('moonpay')}
+                                        className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedMethod === 'moonpay' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-100 bg-white'}`}
+                                    >
+                                        <span className="absolute -top-3 right-4 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wide">Recommended</span>
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-lg ${selectedMethod === 'moonpay' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                                <CreditCard size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-gray-900">Credit Card (MoonPay)</p>
+                                                <p className="text-xs text-gray-500">Visa / Mastercard</p>
+                                            </div>
+                                            {selectedMethod === 'moonpay' && <CheckCircle2 size={20} className="ml-auto text-blue-600" />}
+                                        </div>
+                                    </div>
+
+                                    {/* Crypto Wallet Option */}
+                                    <div 
+                                        onClick={() => setSelectedMethod('crypto')}
+                                        className={`relative p-4 rounded-xl border-2 cursor-pointer transition-all ${selectedMethod === 'crypto' ? 'border-blue-600 bg-blue-50/50' : 'border-gray-100 bg-white'}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className={`p-2 rounded-lg ${selectedMethod === 'crypto' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                                <Wallet size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-gray-900">Crypto Wallet</p>
+                                                <p className="text-xs text-gray-500">Metamask / WalletConnect</p>
+                                            </div>
+                                            {selectedMethod === 'crypto' && <CheckCircle2 size={20} className="ml-auto text-blue-600" />}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={() => selectedMethod === 'moonpay' ? setMoonPayOpen(true) : handleCryptoPay()}
+                                    disabled={isCryptoProcessing}
+                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition-colors flex items-center justify-center gap-2 group shadow-lg shadow-blue-200"
+                                >
+                                    {isCryptoProcessing ? <Loader2 className="animate-spin" /> : <span>Pay ${INVOICE_DATA.amountUSD.toFixed(2)}</span>}
+                                    {!isCryptoProcessing && <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />}
+                                </button>
+                                
+                                <p className="text-center text-xs text-gray-400 mt-4">
+                                    Secure payments powered by Web3 & Blockchain.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {isMoonPayOpen && <MoonPayWidget amount={INVOICE_DATA.amountUSD} onClose={() => setMoonPayOpen(false)} onComplete={handleMoonPayComplete} />}
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            
+            return (
+                <div className="min-h-screen">
+                    <Navbar user={user} onLogout={() => setUser(null)} />
+                    <main className="pb-12 print:pb-0">
+                        {!user ? <LoginScreen onLogin={setUser} /> : <InvoiceDashboard user={user} />}
+                    </main>
+                    <footer className="border-t border-gray-200 bg-white py-8 text-center text-sm text-gray-400 no-print">
+                        <p>&copy; 2024 Mechanical Temp. All rights reserved.</p>
+                    </footer>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
