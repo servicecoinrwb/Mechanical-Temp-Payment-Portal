@@ -321,7 +321,7 @@
             );
         };
 
-        // --- MANUAL CRYPTO WIDGET (MOVED UP TO FIX SCOPING) ---
+        // --- MANUAL CRYPTO WIDGET ---
         const ManualCryptoWidget = ({ address, amount, onClose }) => {
             const [copied, setCopied] = useState(false);
             const handleCopy = () => { navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); };
@@ -1195,6 +1195,9 @@
 
             return (
                 <div className="space-y-8">
+                    {/* --- ADD THE WALLET WIDGET HERE --- */}
+                    <AdminWalletWidget user={user} /> 
+
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                             <p className="text-gray-500 text-sm font-medium">Total Revenue</p>
