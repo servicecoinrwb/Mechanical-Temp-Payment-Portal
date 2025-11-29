@@ -245,7 +245,7 @@
                             email: userInfo.email, 
                             isAdmin: true, 
                             name: "Admin", 
-                            walletAddress: address, // Ensure address is passed
+                            walletAddress: address, 
                             web3authInstance: web3auth 
                         });
                         return;
@@ -1020,6 +1020,173 @@
                             </table>
                         </div>
                     </div>
+                </div>
+            );
+        };
+
+        // --- CUSTOMER DASHBOARD ---
+        const ManualCryptoWidget = ({ address, amount, onClose }) => {
+            const [copied, setCopied] = useState(false);
+            const handleCopy = () => { navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+            return (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+                        <div className="bg-slate-900 p-4 flex justify-between items-center text-white"><span className="font-bold tracking-tight flex items-center gap-2"><QrCode size={18}/> Manual Transfer</span><button onClick={onClose} className="hover:bg-white/20 p-1 rounded transition-colors">✕</button></div>
+                        <div className="p-6 flex-col flex items-center text-center space-y-4">
+                            <div className="bg-white p-2 border border-gray-200 rounded-xl shadow-sm"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${address}`} alt="Wallet QR" className="w-40 h-40 object-contain rounded-lg" /></div>
+                            <div><p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Send USDC (Arbitrum One)</p><div onClick={handleCopy} className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center gap-2 cursor-pointer hover:border-sky-400 hover:bg-sky-50 transition-all group"><code className="text-xs font-mono text-slate-600 break-all">{address}</code><div className="text-slate-400 group-hover:text-sky-500">{copied ? <CheckCircle2 size={16}/> : <ArrowRight size={16} className="-rotate-45"/>}</div></div>{copied && <p className="text-xs text-green-600 font-bold mt-2 animate-pulse">Address Copied!</p>}</div>
+                            <button onClick={onClose} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors">I have sent the payment</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const InvoiceDetail = ({ invoice, customer, onBack, onPaymentSuccess }) => {
+            const [paymentMethod, setPaymentMethod] = useState('stripe');
+            const [showManualWidget, setShowManualWidget] = useState(false);
+            const [isMining, setIsMining] = useState(false); // Track mining status
+            
+            // GET BUSINESS WALLET WALLET
+            const savedSettings = localStorage.getItem('mt_vault_settings');
+            const vaultSettings = savedSettings ? JSON.parse(savedSettings) : {};
+            // Default to Bank Address if set, otherwise fallback to Vault address
+            const businessAddress = vaultSettings.bankAddress || vaultSettings.address || "0xE6b8EAb212c8E33c825e49E6C36F3030955E890d"; 
+
+            const items = invoice.items || [];
+            const totalAmount = items.reduce((acc, item) => acc + (parseFloat(item.qty||0) * parseFloat(item.unitPrice||0)), 0);
+            
+            if (invoice.status === 'Paid') {
+                return (
+                    <div className="max-w-xl mx-auto text-center py-12">
+                        <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600"><CheckCircle2 size={48} /></div>
+                        <h2 className="text-3xl font-bold text-gray-900 mb-2">Invoice Paid</h2>
+                        <p className="text-gray-500 mb-8">Transaction recorded on Blockchain.</p>
+                        <button onClick={onBack} className="text-sky-600 hover:underline">Back to Invoices</button>
+                    </div>
+                );
+            }
+
+            // --- RESTORED SMART CONTRACT LOGIC (USDC VERSION) ---
+            const handleContractPay = async () => {
+                if(!customer.web3authInstance && !window.ethereum) return alert("Please connect a wallet to use Smart Contract payment.");
+                
+                setIsMining(true);
+                try {
+                    // 1. Setup Provider
+                    let provider;
+                    if(customer.web3authInstance) {
+                        provider = new ethers.BrowserProvider(customer.web3authInstance.provider);
+                    } else {
+                        provider = new ethers.BrowserProvider(window.ethereum);
+                    }
+                    
+                    const signer = await provider.getSigner();
+                    const userAddr = await signer.getAddress();
+                    
+                    // 2. Connect to Contracts
+                    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+                    const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, signer);
+                    
+                    // 3. Approve USDC
+                    // Amount in 6 decimals (USDC has 6 decimals)
+                    const amount6 = ethers.parseUnits(totalAmount.toString(), 6);
+                    
+                    // Check allowance
+                    const allowance = await usdc.allowance(userAddr, CONTRACT_ADDRESS);
+                    if(allowance < amount6) {
+                         alert("Step 1/2: Please approve USDC spending in your wallet.");
+                         const txApprove = await usdc.approve(CONTRACT_ADDRESS, amount6);
+                         await txApprove.wait();
+                    }
+
+                    // 4. Pay Invoice
+                    alert("Step 2/2: Confirm Payment Transaction.");
+                    const tx = await contract.payInvoice(invoice.id, amount6);
+                    
+                    alert(`Transaction Sent! Hash: ${tx.hash}`);
+                    await tx.wait();
+                    
+                    onPaymentSuccess();
+                    
+                } catch (e) {
+                    console.error(e);
+                    alert("Payment failed: " + (e.reason || e.message));
+                } finally {
+                    setIsMining(false);
+                }
+            };
+
+            const handlePayment = () => {
+                if (paymentMethod === 'stripe') {
+                    // UX IMPROVEMENT: Automatic Copy-to-Clipboard for Static Payment Links
+                    const amountStr = totalAmount.toFixed(2);
+                    navigator.clipboard.writeText(amountStr).then(() => {
+                        // Success copy
+                        if(confirm(`$${amountStr} has been copied to your clipboard!\n\nStandard Stripe Payment Links do not allow automatic pricing.\n\nPlease PASTE the amount into the "Price" field on the next screen.\n\nClick OK to proceed to Stripe.`)) {
+                             window.open(STRIPE_LINK, '_blank');
+                             // Optional: Ask if they paid to mark it pending/paid?
+                        }
+                    }).catch(() => {
+                        // Fail copy (security settings)
+                        if(confirm(`Please manually enter $${amountStr} on the Stripe payment page.\n\nClick OK to open Stripe.`)) {
+                             window.open(STRIPE_LINK, '_blank');
+                        }
+                    });
+                } else if (paymentMethod === 'moonpay') {
+                    const moonPayLink = `${MOONPAY_BASE_URL}?currencyCode=usdc_arbitrum&walletAddress=${businessAddress}`;
+                    if(confirm(`Opening MoonPay to pay Mechanical Temp.\n\nDestination: Business Wallet\n${businessAddress.substring(0,10)}...\n\nClick OK if you completed the transaction.`)) {
+                         window.open(moonPayLink, '_blank');
+                         onPaymentSuccess();
+                    }
+                } else if (paymentMethod === 'contract') {
+                   // Explicitly passing the contract address here as requested
+                   handleContractPay("0xE6b8EAb212c8E33c825e49E6C36F3030955E890d");
+                } else {
+                    setShowManualWidget(true);
+                }
+            };
+
+            return (
+                <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in slide-in-from-bottom-4">
+                    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                        <div className="flex justify-between items-start mb-8 pb-8 border-b border-gray-100">
+                            <div><button onClick={onBack} className="mb-4 text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 no-print"><ChevronLeft size={16}/> Back</button><h1 className="text-2xl font-bold text-gray-900">INVOICE</h1><p className="text-gray-500 mt-1">{invoice.id}</p></div>
+                        </div>
+                        
+                        {invoice.comments && (
+                            <div className="mb-8 p-4 bg-yellow-50 border border-yellow-100 rounded-lg text-sm text-yellow-800 flex gap-3">
+                                <MessageSquare size={18} className="shrink-0 mt-0.5" />
+                                <div>
+                                    <span className="font-bold block mb-1">Note from Admin:</span>
+                                    {invoice.comments}
+                                </div>
+                            </div>
+                        )}
+
+                        <table className="w-full text-sm text-left mb-8"><thead className="bg-slate-50 text-slate-500 font-medium"><tr><th className="px-4 py-3">Description</th><th className="px-4 py-3 text-center">Qty</th><th className="px-4 py-3 text-right">Price</th><th className="px-4 py-3 text-right">Total</th></tr></thead>
+                        <tbody className="divide-y divide-gray-100">{items.map((item, i) => (
+                            <tr key={i}><td className="px-4 py-4">{item.desc}</td><td className="px-4 py-4 text-center">{item.qty}</td><td className="px-4 py-4 text-right">${parseFloat(item.unitPrice).toFixed(2)}</td><td className="px-4 py-4 text-right font-medium">${(parseFloat(item.qty)*parseFloat(item.unitPrice)).toFixed(2)}</td></tr>
+                        ))}</tbody></table>
+                        <div className="flex justify-end border-t border-gray-100 pt-6"><div className="w-48 flex justify-between items-center text-lg font-bold text-gray-900"><span>Total Due</span><span>${totalAmount.toFixed(2)}</span></div></div>
+                    </div>
+                    <div className="w-full lg:w-[380px] no-print">
+                        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-24">
+                            <h3 className="font-bold text-gray-900 mb-4">Select Payment Method</h3>
+                            <div onClick={() => setPaymentMethod('stripe')} className={`p-4 rounded-xl border-2 cursor-pointer mb-3 transition-all ${paymentMethod === 'stripe' ? 'border-[#635BFF] bg-indigo-50' : 'border-gray-100 hover:border-gray-200'}`}><div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${paymentMethod === 'stripe' ? 'bg-[#635BFF] text-white' : 'bg-gray-100 text-gray-500'}`}><CreditCard size={20} /></div><div className="flex-1"><p className="font-semibold text-gray-900">Credit Card</p><p className="text-xs text-gray-500">via Stripe Checkout</p></div></div></div>
+                            <div onClick={() => setPaymentMethod('moonpay')} className={`p-4 rounded-xl border-2 cursor-pointer mb-3 transition-all ${paymentMethod === 'moonpay' ? 'border-[#7D00FF] bg-purple-50' : 'border-gray-100 hover:border-gray-200'}`}><div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${paymentMethod === 'moonpay' ? 'bg-[#7D00FF] text-white' : 'bg-gray-100 text-gray-500'}`}><Wallet size={20} /></div><div className="flex-1"><p className="font-semibold text-gray-900">Crypto / Card</p><p className="text-xs text-gray-500">via MoonPay</p></div></div></div>
+                            
+                            {/* RESTORED: Smart Contract Option */}
+                            <div onClick={() => setPaymentMethod('contract')} className={`p-4 rounded-xl border-2 cursor-pointer mb-3 transition-all ${paymentMethod === 'contract' ? 'border-orange-500 bg-orange-50' : 'border-gray-100 hover:border-gray-200'}`}><div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${paymentMethod === 'contract' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'}`}><FileText size={20} /></div><div className="flex-1"><p className="font-semibold text-gray-900">Smart Contract</p><p className="text-xs text-gray-500">Pay in USDC (Low Gas)</p></div></div></div>
+
+                            <div onClick={() => setPaymentMethod('manual')} className={`p-4 rounded-xl border-2 cursor-pointer mb-6 transition-all ${paymentMethod === 'manual' ? 'border-sky-500 bg-sky-50' : 'border-gray-100 hover:border-gray-200'}`}><div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${paymentMethod === 'manual' ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-500'}`}><QrCode size={20} /></div><div className="flex-1"><p className="font-semibold text-gray-900">Manual Transfer</p><p className="text-xs text-gray-500">External Wallet</p></div></div></div>
+                            
+                            <button onClick={handlePayment} disabled={isMining} className={`w-full text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 ${paymentMethod === 'stripe' ? 'bg-[#635BFF]' : paymentMethod === 'moonpay' ? 'bg-[#7D00FF]' : paymentMethod === 'contract' ? 'bg-orange-500' : 'bg-sky-500'}`}>
+                                {isMining ? <Loader2 className="animate-spin"/> : "Pay Now"}
+                            </button>
+                        </div>
+                    </div>
+                    {showManualWidget && <ManualCryptoWidget address={businessAddress} amount={totalAmount} onClose={() => setShowManualWidget(false)} />}
                 </div>
             );
         };
