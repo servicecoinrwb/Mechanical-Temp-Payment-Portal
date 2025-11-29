@@ -241,7 +241,13 @@
                     const address = await signer.getAddress();
 
                     if (userInfo.email === "admin@mechanicaltemp.com") {
-                        onLogin({ email: userInfo.email, isAdmin: true, name: "Admin", web3authInstance: web3auth });
+                        onLogin({ 
+                            email: userInfo.email, 
+                            isAdmin: true, 
+                            name: "Admin", 
+                            walletAddress: address, // FIXED: Ensure Admin gets wallet address
+                            web3authInstance: web3auth 
+                        });
                         return;
                     }
 
@@ -391,7 +397,7 @@
                                 <Wallet size={24} className="text-sky-400" /> Admin Wallet
                             </h3>
                             <p className="text-sm text-slate-400 mt-1 font-mono bg-slate-900 px-3 py-1 rounded border border-slate-700 select-all">
-                                {user.walletAddress}
+                                {user.walletAddress || "Loading Address..."}
                             </p>
                         </div>
                         <div className="mt-4 md:mt-0 flex gap-6 text-right">
@@ -513,18 +519,10 @@
                 }
             }
 
-            // REVERSIBLE STATUS TOGGLE
-            const handleToggleStatus = async (inv) => {
-                const currentStatus = inv.status || 'Pending';
-                const isPaid = currentStatus === 'Paid';
-                const newStatus = isPaid ? 'Pending' : 'Paid';
-                
-                const confirmMsg = isPaid 
-                    ? `Are you sure you want to mark Invoice #${inv.id} as PENDING (Unpaid)?` 
-                    : `Mark Invoice #${inv.id} as PAID?`;
-
-                if(confirm(confirmMsg)) {
-                    await onUpdateStatus(inv.docId, newStatus);
+            const handleMarkPaid = async (inv) => {
+                if (inv.status === 'Paid') return;
+                if(confirm(`Mark Invoice #${inv.id} as PAID?`)) {
+                    await onUpdateStatus(inv.docId, 'Paid');
                 }
             }
 
@@ -1003,7 +1001,7 @@
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                                    <button onClick={() => handleToggleStatus(inv)} className={`p-2 ${inv.status === 'Paid' ? 'text-green-600 hover:text-red-600' : 'text-gray-400 hover:text-green-600'}`} title={inv.status === 'Paid' ? "Click to mark Pending" : "Click to mark Paid"}>{inv.status === 'Paid' ? <CheckCircle2 size={18} fill="currentColor" className="opacity-20" /> : <CheckCircle2 size={18} />}</button>
+                                                    <button onClick={() => handleMarkPaid(inv)} className={`p-2 ${inv.status === 'Paid' ? 'text-green-600 hover:text-red-600' : 'text-gray-400 hover:text-green-600'}`} title={inv.status === 'Paid' ? "Click to mark Pending" : "Click to mark Paid"}>{inv.status === 'Paid' ? <CheckCircle2 size={18} fill="currentColor" className="opacity-20" /> : <CheckCircle2 size={18} />}</button>
                                                     <button onClick={() => handleEditInvoice(inv)} className="text-gray-400 hover:text-blue-600 p-2" title="Edit Invoice"><Edit size={18} /></button>
                                                     <button onClick={() => handleDeleteInvoice(inv.docId)} className="text-gray-400 hover:text-red-600 p-2" title="Delete Invoice"><Trash2 size={18} /></button>
                                                 </td>
