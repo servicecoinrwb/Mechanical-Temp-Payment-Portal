@@ -245,7 +245,7 @@
                             email: userInfo.email, 
                             isAdmin: true, 
                             name: "Admin", 
-                            walletAddress: address, // FIXED: Ensure Admin gets wallet address
+                            walletAddress: address, // Ensure address is passed
                             web3authInstance: web3auth 
                         });
                         return;
@@ -519,10 +519,18 @@
                 }
             }
 
-            const handleMarkPaid = async (inv) => {
-                if (inv.status === 'Paid') return;
-                if(confirm(`Mark Invoice #${inv.id} as PAID?`)) {
-                    await onUpdateStatus(inv.docId, 'Paid');
+            // REVERSIBLE STATUS TOGGLE
+            const handleToggleStatus = async (inv) => {
+                const currentStatus = inv.status || 'Pending';
+                const isPaid = currentStatus === 'Paid';
+                const newStatus = isPaid ? 'Pending' : 'Paid';
+                
+                const confirmMsg = isPaid 
+                    ? `Are you sure you want to mark Invoice #${inv.id} as PENDING (Unpaid)?` 
+                    : `Mark Invoice #${inv.id} as PAID?`;
+
+                if(confirm(confirmMsg)) {
+                    await onUpdateStatus(inv.docId, newStatus);
                 }
             }
 
@@ -1001,7 +1009,7 @@
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                                    <button onClick={() => handleMarkPaid(inv)} className={`p-2 ${inv.status === 'Paid' ? 'text-green-600 hover:text-red-600' : 'text-gray-400 hover:text-green-600'}`} title={inv.status === 'Paid' ? "Click to mark Pending" : "Click to mark Paid"}>{inv.status === 'Paid' ? <CheckCircle2 size={18} fill="currentColor" className="opacity-20" /> : <CheckCircle2 size={18} />}</button>
+                                                    <button onClick={() => handleToggleStatus(inv)} className={`p-2 ${inv.status === 'Paid' ? 'text-green-600 hover:text-red-600' : 'text-gray-400 hover:text-green-600'}`} title={inv.status === 'Paid' ? "Click to mark Pending" : "Click to mark Paid"}>{inv.status === 'Paid' ? <CheckCircle2 size={18} fill="currentColor" className="opacity-20" /> : <CheckCircle2 size={18} />}</button>
                                                     <button onClick={() => handleEditInvoice(inv)} className="text-gray-400 hover:text-blue-600 p-2" title="Edit Invoice"><Edit size={18} /></button>
                                                     <button onClick={() => handleDeleteInvoice(inv.docId)} className="text-gray-400 hover:text-red-600 p-2" title="Delete Invoice"><Trash2 size={18} /></button>
                                                 </td>
@@ -1010,6 +1018,70 @@
                                     })}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const CustomerDashboard = ({ user, invoices, onUpdateStatus, onSaveProfile }) => {
+            const [selectedInvoice, setSelectedInvoice] = useState(null);
+            const [isEditing, setIsEditing] = useState(false);
+            const [profileForm, setProfileForm] = useState({ name: user.name || "", address: user.address || "" });
+            useEffect(() => { setProfileForm({ name: user.name || "", address: user.address || "" }); }, [user]);
+            const handleSave = async (e) => { e.preventDefault(); await onSaveProfile(profileForm); setIsEditing(false); };
+            
+            // Payment Success Handler - Marks history instantly
+            const handlePaymentSuccess = () => {
+                 onUpdateStatus(selectedInvoice.docId, 'Paid'); 
+                 setSelectedInvoice({...selectedInvoice, status: 'Paid'}); 
+            };
+
+            if (selectedInvoice) return <InvoiceDetail invoice={selectedInvoice} customer={user} onBack={() => setSelectedInvoice(null)} onPaymentSuccess={handlePaymentSuccess} />;
+            return (
+                <div className="max-w-4xl mx-auto space-y-8">
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                        <div className="flex justify-between items-start mb-4"><h2 className="text-xl font-bold text-gray-900">My Information</h2>{!isEditing && <button onClick={() => setIsEditing(true)} className="text-sky-600 text-sm font-medium hover:underline flex items-center gap-1"><Edit size={16} /> Edit Info</button>}</div>
+                        {isEditing ? (
+                            <form onSubmit={handleSave} className="space-y-4">
+                                <input className="w-full p-2 border rounded" value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} placeholder="Name" />
+                                <textarea className="w-full p-2 border rounded" value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} placeholder="Address" />
+                                <div className="flex gap-2"><button className="bg-sky-500 text-white px-4 py-2 rounded-lg">Save</button><button type="button" onClick={() => setIsEditing(false)} className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg">Cancel</button></div>
+                            </form>
+                        ) : (
+                            <div className="grid md:grid-cols-2 gap-4 text-sm">
+                                <div><p className="text-gray-500">Name</p><p className="font-medium text-lg">{user.name || "N/A"}</p></div>
+                                <div><p className="text-gray-500">Email</p><p className="font-medium">{user.email || "N/A"}</p></div>
+                                <div><p className="text-gray-500">Address</p><p className="font-medium">{user.address || "N/A"}</p></div>
+                                <div><p className="text-gray-500">Wallet</p><p className="font-mono bg-slate-100 px-3 py-1.5 rounded-lg text-xs text-sky-700 break-all border border-slate-200">{user.walletAddress}</p></div>
+                            </div>
+                        )}
+                    </div>
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Invoices</h2>
+                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                            {(invoices || []).length === 0 ? <div className="p-8 text-center text-gray-500">No invoices found.</div> : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left"><thead className="bg-slate-50 text-slate-500 text-sm"><tr><th className="px-6 py-4">Invoice #</th><th className="px-6 py-4">Date</th><th className="px-6 py-4">Due</th><th className="px-6 py-4">Total</th><th className="px-6 py-4">Status</th><th className="px-6 py-4"></th></tr></thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {(invoices || []).map(inv => {
+                                            if (!inv.id || !inv.customerId) return null;
+                                            const items = inv.items || [];
+                                            const total = items.reduce((acc, i) => acc + (parseFloat(i.qty||0) * parseFloat(i.unitPrice||0)), 0);
+                                            return (
+                                                <tr key={inv.docId} className={`hover:bg-slate-50 ${inv.status === 'Paid' ? 'bg-green-50/30' : ''}`}>
+                                                    <td className="px-6 py-4 font-mono text-gray-600">{inv.id}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{inv.date}</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-600">{inv.dueDate}</td>
+                                                    <td className="px-6 py-4 font-medium text-gray-900">${total.toFixed(2)}</td>
+                                                    <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs font-bold ${inv.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{inv.status}</span></td>
+                                                    <td className="px-6 py-4 text-right"><button onClick={() => setSelectedInvoice(inv)} className="text-sky-600 hover:text-sky-800 font-medium text-sm flex items-center gap-1">View <ArrowRight size={14} /></button></td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody></table>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
