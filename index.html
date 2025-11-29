@@ -513,10 +513,18 @@
                 }
             }
 
-            const handleMarkPaid = async (inv) => {
-                if (inv.status === 'Paid') return;
-                if(confirm(`Mark Invoice #${inv.id} as PAID?`)) {
-                    await onUpdateStatus(inv.docId, 'Paid');
+            // REVERSIBLE STATUS TOGGLE
+            const handleToggleStatus = async (inv) => {
+                const currentStatus = inv.status || 'Pending';
+                const isPaid = currentStatus === 'Paid';
+                const newStatus = isPaid ? 'Pending' : 'Paid';
+                
+                const confirmMsg = isPaid 
+                    ? `Are you sure you want to mark Invoice #${inv.id} as PENDING (Unpaid)?` 
+                    : `Mark Invoice #${inv.id} as PAID?`;
+
+                if(confirm(confirmMsg)) {
+                    await onUpdateStatus(inv.docId, newStatus);
                 }
             }
 
@@ -995,7 +1003,7 @@
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                                    <button onClick={() => handleMarkPaid(inv)} className={`p-2 ${inv.status === 'Paid' ? 'text-green-500 cursor-default' : 'text-gray-400 hover:text-green-600'}`} title="Mark Paid"><CheckCircle2 size={18} /></button>
+                                                    <button onClick={() => handleToggleStatus(inv)} className={`p-2 ${inv.status === 'Paid' ? 'text-green-600 hover:text-red-600' : 'text-gray-400 hover:text-green-600'}`} title={inv.status === 'Paid' ? "Click to mark Pending" : "Click to mark Paid"}>{inv.status === 'Paid' ? <CheckCircle2 size={18} fill="currentColor" className="opacity-20" /> : <CheckCircle2 size={18} />}</button>
                                                     <button onClick={() => handleEditInvoice(inv)} className="text-gray-400 hover:text-blue-600 p-2" title="Edit Invoice"><Edit size={18} /></button>
                                                     <button onClick={() => handleDeleteInvoice(inv.docId)} className="text-gray-400 hover:text-red-600 p-2" title="Delete Invoice"><Trash2 size={18} /></button>
                                                 </td>
@@ -1004,237 +1012,6 @@
                                     })}
                                 </tbody>
                             </table>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- CUSTOMER DASHBOARD ---
-        const ManualCryptoWidget = ({ address, amount, onClose }) => {
-            const [copied, setCopied] = useState(false);
-            const handleCopy = () => { navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); };
-            return (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl flex flex-col">
-                        <div className="bg-slate-900 p-4 flex justify-between items-center text-white"><span className="font-bold tracking-tight flex items-center gap-2"><QrCode size={18}/> Manual Transfer</span><button onClick={onClose} className="hover:bg-white/20 p-1 rounded transition-colors">✕</button></div>
-                        <div className="p-6 flex-col flex items-center text-center space-y-4">
-                            <div className="bg-white p-2 border border-gray-200 rounded-xl shadow-sm"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${address}`} alt="Wallet QR" className="w-40 h-40 object-contain rounded-lg" /></div>
-                            <div><p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Send USDC (Arbitrum One)</p><div onClick={handleCopy} className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center gap-2 cursor-pointer hover:border-sky-400 hover:bg-sky-50 transition-all group"><code className="text-xs font-mono text-slate-600 break-all">{address}</code><div className="text-slate-400 group-hover:text-sky-500">{copied ? <CheckCircle2 size={16}/> : <ArrowRight size={16} className="-rotate-45"/>}</div></div>{copied && <p className="text-xs text-green-600 font-bold mt-2 animate-pulse">Address Copied!</p>}</div>
-                            <button onClick={onClose} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors">I have sent the payment</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        const InvoiceDetail = ({ invoice, customer, onBack, onPaymentSuccess }) => {
-            const [paymentMethod, setPaymentMethod] = useState('stripe');
-            const [showManualWidget, setShowManualWidget] = useState(false);
-            const [isMining, setIsMining] = useState(false); // Track mining status
-            
-            // GET BUSINESS WALLET WALLET
-            const savedSettings = localStorage.getItem('mt_vault_settings');
-            const vaultSettings = savedSettings ? JSON.parse(savedSettings) : {};
-            // Default to Bank Address if set, otherwise fallback to Vault address
-            const businessAddress = vaultSettings.bankAddress || vaultSettings.address || "0xE6b8EAb212c8E33c825e49E6C36F3030955E890d"; 
-
-            const items = invoice.items || [];
-            const totalAmount = items.reduce((acc, item) => acc + (parseFloat(item.qty||0) * parseFloat(item.unitPrice||0)), 0);
-            
-            if (invoice.status === 'Paid') {
-                return (
-                    <div className="max-w-xl mx-auto text-center py-12">
-                        <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600"><CheckCircle2 size={48} /></div>
-                        <h2 className="text-3xl font-bold text-gray-900 mb-2">Invoice Paid</h2>
-                        <p className="text-gray-500 mb-8">Transaction recorded on Blockchain.</p>
-                        <button onClick={onBack} className="text-sky-600 hover:underline">Back to Invoices</button>
-                    </div>
-                );
-            }
-
-            // --- RESTORED SMART CONTRACT LOGIC (USDC VERSION) ---
-            const handleContractPay = async () => {
-                if(!customer.web3authInstance && !window.ethereum) return alert("Please connect a wallet to use Smart Contract payment.");
-                
-                setIsMining(true);
-                try {
-                    // 1. Setup Provider
-                    let provider;
-                    if(customer.web3authInstance) {
-                        provider = new ethers.BrowserProvider(customer.web3authInstance.provider);
-                    } else {
-                        provider = new ethers.BrowserProvider(window.ethereum);
-                    }
-                    
-                    const signer = await provider.getSigner();
-                    const userAddr = await signer.getAddress();
-                    
-                    // 2. Connect to Contracts
-                    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-                    const usdc = new ethers.Contract(USDC_ADDRESS, ERC20_ABI, signer);
-                    
-                    // 3. Approve USDC
-                    // Amount in 6 decimals (USDC has 6 decimals)
-                    const amount6 = ethers.parseUnits(totalAmount.toString(), 6);
-                    
-                    // Check allowance
-                    const allowance = await usdc.allowance(userAddr, CONTRACT_ADDRESS);
-                    if(allowance < amount6) {
-                         alert("Step 1/2: Please approve USDC spending in your wallet.");
-                         const txApprove = await usdc.approve(CONTRACT_ADDRESS, amount6);
-                         await txApprove.wait();
-                    }
-
-                    // 4. Pay Invoice
-                    alert("Step 2/2: Confirm Payment Transaction.");
-                    const tx = await contract.payInvoice(invoice.id, amount6);
-                    
-                    alert(`Transaction Sent! Hash: ${tx.hash}`);
-                    await tx.wait();
-                    
-                    onPaymentSuccess();
-                    
-                } catch (e) {
-                    console.error(e);
-                    alert("Payment failed: " + (e.reason || e.message));
-                } finally {
-                    setIsMining(false);
-                }
-            };
-
-            const handlePayment = () => {
-                if (paymentMethod === 'stripe') {
-                    // UX IMPROVEMENT: Automatic Copy-to-Clipboard for Static Payment Links
-                    const amountStr = totalAmount.toFixed(2);
-                    navigator.clipboard.writeText(amountStr).then(() => {
-                        // Success copy
-                        if(confirm(`$${amountStr} has been copied to your clipboard!\n\nStandard Stripe Payment Links do not allow automatic pricing.\n\nPlease PASTE the amount into the "Price" field on the next screen.\n\nClick OK to proceed to Stripe.`)) {
-                             window.open(STRIPE_LINK, '_blank');
-                             // Optional: Ask if they paid to mark it pending/paid?
-                        }
-                    }).catch(() => {
-                        // Fail copy (security settings)
-                        if(confirm(`Please manually enter $${amountStr} on the Stripe payment page.\n\nClick OK to open Stripe.`)) {
-                             window.open(STRIPE_LINK, '_blank');
-                        }
-                    });
-                } else if (paymentMethod === 'moonpay') {
-                    const moonPayLink = `${MOONPAY_BASE_URL}?currencyCode=usdc_arbitrum&walletAddress=${businessAddress}`;
-                    if(confirm(`Opening MoonPay to pay Mechanical Temp.\n\nDestination: Business Wallet\n${businessAddress.substring(0,10)}...\n\nClick OK if you completed the transaction.`)) {
-                         window.open(moonPayLink, '_blank');
-                         onPaymentSuccess();
-                    }
-                } else if (paymentMethod === 'contract') {
-                   // Explicitly passing the contract address here as requested
-                   handleContractPay("0xE6b8EAb212c8E33c825e49E6C36F3030955E890d");
-                } else {
-                    setShowManualWidget(true);
-                }
-            };
-
-            return (
-                <div className="flex flex-col lg:flex-row gap-8 animate-in fade-in slide-in-from-bottom-4">
-                    <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                        <div className="flex justify-between items-start mb-8 pb-8 border-b border-gray-100">
-                            <div><button onClick={onBack} className="mb-4 text-sm text-gray-400 hover:text-gray-600 flex items-center gap-1 no-print"><ChevronLeft size={16}/> Back</button><h1 className="text-2xl font-bold text-gray-900">INVOICE</h1><p className="text-gray-500 mt-1">{invoice.id}</p></div>
-                        </div>
-                        
-                        {invoice.comments && (
-                            <div className="mb-8 p-4 bg-yellow-50 border border-yellow-100 rounded-lg text-sm text-yellow-800 flex gap-3">
-                                <MessageSquare size={18} className="shrink-0 mt-0.5" />
-                                <div>
-                                    <span className="font-bold block mb-1">Note from Admin:</span>
-                                    {invoice.comments}
-                                </div>
-                            </div>
-                        )}
-
-                        <table className="w-full text-sm text-left mb-8"><thead className="bg-slate-50 text-slate-500 font-medium"><tr><th className="px-4 py-3">Description</th><th className="px-4 py-3 text-center">Qty</th><th className="px-4 py-3 text-right">Price</th><th className="px-4 py-3 text-right">Total</th></tr></thead>
-                        <tbody className="divide-y divide-gray-100">{items.map((item, i) => (
-                            <tr key={i}><td className="px-4 py-4">{item.desc}</td><td className="px-4 py-4 text-center">{item.qty}</td><td className="px-4 py-4 text-right">${parseFloat(item.unitPrice).toFixed(2)}</td><td className="px-4 py-4 text-right font-medium">${(parseFloat(item.qty)*parseFloat(item.unitPrice)).toFixed(2)}</td></tr>
-                        ))}</tbody></table>
-                        <div className="flex justify-end border-t border-gray-100 pt-6"><div className="w-48 flex justify-between items-center text-lg font-bold text-gray-900"><span>Total Due</span><span>${totalAmount.toFixed(2)}</span></div></div>
-                    </div>
-                    <div className="w-full lg:w-[380px] no-print">
-                        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sticky top-24">
-                            <h3 className="font-bold text-gray-900 mb-4">Select Payment Method</h3>
-                            <div onClick={() => setPaymentMethod('stripe')} className={`p-4 rounded-xl border-2 cursor-pointer mb-3 transition-all ${paymentMethod === 'stripe' ? 'border-[#635BFF] bg-indigo-50' : 'border-gray-100 hover:border-gray-200'}`}><div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${paymentMethod === 'stripe' ? 'bg-[#635BFF] text-white' : 'bg-gray-100 text-gray-500'}`}><CreditCard size={20} /></div><div className="flex-1"><p className="font-semibold text-gray-900">Credit Card</p><p className="text-xs text-gray-500">via Stripe Checkout</p></div></div></div>
-                            <div onClick={() => setPaymentMethod('moonpay')} className={`p-4 rounded-xl border-2 cursor-pointer mb-3 transition-all ${paymentMethod === 'moonpay' ? 'border-[#7D00FF] bg-purple-50' : 'border-gray-100 hover:border-gray-200'}`}><div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${paymentMethod === 'moonpay' ? 'bg-[#7D00FF] text-white' : 'bg-gray-100 text-gray-500'}`}><Wallet size={20} /></div><div className="flex-1"><p className="font-semibold text-gray-900">Crypto / Card</p><p className="text-xs text-gray-500">via MoonPay</p></div></div></div>
-                            
-                            {/* RESTORED: Smart Contract Option */}
-                            <div onClick={() => setPaymentMethod('contract')} className={`p-4 rounded-xl border-2 cursor-pointer mb-3 transition-all ${paymentMethod === 'contract' ? 'border-orange-500 bg-orange-50' : 'border-gray-100 hover:border-gray-200'}`}><div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${paymentMethod === 'contract' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-500'}`}><FileText size={20} /></div><div className="flex-1"><p className="font-semibold text-gray-900">Smart Contract</p><p className="text-xs text-gray-500">Pay in USDC (Low Gas)</p></div></div></div>
-
-                            <div onClick={() => setPaymentMethod('manual')} className={`p-4 rounded-xl border-2 cursor-pointer mb-6 transition-all ${paymentMethod === 'manual' ? 'border-sky-500 bg-sky-50' : 'border-gray-100 hover:border-gray-200'}`}><div className="flex items-center gap-3"><div className={`p-2 rounded-lg ${paymentMethod === 'manual' ? 'bg-sky-500 text-white' : 'bg-gray-100 text-gray-500'}`}><QrCode size={20} /></div><div className="flex-1"><p className="font-semibold text-gray-900">Manual Transfer</p><p className="text-xs text-gray-500">External Wallet</p></div></div></div>
-                            
-                            <button onClick={handlePayment} disabled={isMining} className={`w-full text-white font-bold py-4 rounded-xl shadow-lg transition-transform hover:scale-[1.02] flex items-center justify-center gap-2 ${paymentMethod === 'stripe' ? 'bg-[#635BFF]' : paymentMethod === 'moonpay' ? 'bg-[#7D00FF]' : paymentMethod === 'contract' ? 'bg-orange-500' : 'bg-sky-500'}`}>
-                                {isMining ? <Loader2 className="animate-spin"/> : "Pay Now"}
-                            </button>
-                        </div>
-                    </div>
-                    {showManualWidget && <ManualCryptoWidget address={businessAddress} amount={totalAmount} onClose={() => setShowManualWidget(false)} />}
-                </div>
-            );
-        };
-
-        const CustomerDashboard = ({ user, invoices, onUpdateStatus, onSaveProfile }) => {
-            const [selectedInvoice, setSelectedInvoice] = useState(null);
-            const [isEditing, setIsEditing] = useState(false);
-            const [profileForm, setProfileForm] = useState({ name: user.name || "", address: user.address || "" });
-            useEffect(() => { setProfileForm({ name: user.name || "", address: user.address || "" }); }, [user]);
-            const handleSave = async (e) => { e.preventDefault(); await onSaveProfile(profileForm); setIsEditing(false); };
-            
-            // Payment Success Handler - Marks history instantly
-            const handlePaymentSuccess = () => {
-                 onUpdateStatus(selectedInvoice.docId, 'Paid'); 
-                 setSelectedInvoice({...selectedInvoice, status: 'Paid'}); 
-            };
-
-            if (selectedInvoice) return <InvoiceDetail invoice={selectedInvoice} customer={user} onBack={() => setSelectedInvoice(null)} onPaymentSuccess={handlePaymentSuccess} />;
-            return (
-                <div className="max-w-4xl mx-auto space-y-8">
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                        <div className="flex justify-between items-start mb-4"><h2 className="text-xl font-bold text-gray-900">My Information</h2>{!isEditing && <button onClick={() => setIsEditing(true)} className="text-sky-600 text-sm font-medium hover:underline flex items-center gap-1"><Edit size={16} /> Edit Info</button>}</div>
-                        {isEditing ? (
-                            <form onSubmit={handleSave} className="space-y-4">
-                                <input className="w-full p-2 border rounded" value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} placeholder="Name" />
-                                <textarea className="w-full p-2 border rounded" value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} placeholder="Address" />
-                                <div className="flex gap-2"><button className="bg-sky-500 text-white px-4 py-2 rounded-lg">Save</button><button type="button" onClick={() => setIsEditing(false)} className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg">Cancel</button></div>
-                            </form>
-                        ) : (
-                            <div className="grid md:grid-cols-2 gap-4 text-sm">
-                                <div><p className="text-gray-500">Name</p><p className="font-medium text-lg">{user.name || "N/A"}</p></div>
-                                <div><p className="text-gray-500">Email</p><p className="font-medium">{user.email || "N/A"}</p></div>
-                                <div><p className="text-gray-500">Address</p><p className="font-medium">{user.address || "N/A"}</p></div>
-                                <div><p className="text-gray-500">Wallet</p><p className="font-mono bg-slate-100 px-3 py-1.5 rounded-lg text-xs text-sky-700 break-all border border-slate-200">{user.walletAddress}</p></div>
-                            </div>
-                        )}
-                    </div>
-                    <div>
-                        <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Invoices</h2>
-                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                            {(invoices || []).length === 0 ? <div className="p-8 text-center text-gray-500">No invoices found.</div> : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left"><thead className="bg-slate-50 text-slate-500 text-sm"><tr><th className="px-6 py-4">Invoice #</th><th className="px-6 py-4">Date</th><th className="px-6 py-4">Due</th><th className="px-6 py-4">Total</th><th className="px-6 py-4">Status</th><th className="px-6 py-4"></th></tr></thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {(invoices || []).map(inv => {
-                                            if (!inv.id || !inv.customerId) return null;
-                                            const items = inv.items || [];
-                                            const total = items.reduce((acc, i) => acc + (parseFloat(i.qty||0) * parseFloat(i.unitPrice||0)), 0);
-                                            return (
-                                                <tr key={inv.docId} className={`hover:bg-slate-50 ${inv.status === 'Paid' ? 'bg-green-50/30' : ''}`}>
-                                                    <td className="px-6 py-4 font-mono text-gray-600">{inv.id}</td>
-                                                    <td className="px-6 py-4 text-sm text-gray-600">{inv.date}</td>
-                                                    <td className="px-6 py-4 text-sm text-gray-600">{inv.dueDate}</td>
-                                                    <td className="px-6 py-4 font-medium text-gray-900">${total.toFixed(2)}</td>
-                                                    <td className="px-6 py-4"><span className={`px-2 py-1 rounded-full text-xs font-bold ${inv.status === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{inv.status}</span></td>
-                                                    <td className="px-6 py-4 text-right"><button onClick={() => setSelectedInvoice(inv)} className="text-sky-600 hover:text-sky-800 font-medium text-sm flex items-center gap-1">View <ArrowRight size={14} /></button></td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody></table>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </div>
