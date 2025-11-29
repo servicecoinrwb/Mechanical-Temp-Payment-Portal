@@ -320,6 +320,24 @@
             );
         };
 
+        // --- MANUAL CRYPTO WIDGET (DEFINED AT TOP LEVEL TO FIX SCOPE ISSUES) ---
+        const ManualCryptoWidget = ({ address, amount, onClose }) => {
+            const [copied, setCopied] = useState(false);
+            const handleCopy = () => { navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); };
+            return (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+                        <div className="bg-slate-900 p-4 flex justify-between items-center text-white"><span className="font-bold tracking-tight flex items-center gap-2"><QrCode size={18}/> Manual Transfer</span><button onClick={onClose} className="hover:bg-white/20 p-1 rounded transition-colors">✕</button></div>
+                        <div className="p-6 flex-col flex items-center text-center space-y-4">
+                            <div className="bg-white p-2 border border-gray-200 rounded-xl shadow-sm"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${address}`} alt="Wallet QR" className="w-40 h-40 object-contain rounded-lg" /></div>
+                            <div><p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Send USDC (Arbitrum One)</p><div onClick={handleCopy} className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center gap-2 cursor-pointer hover:border-sky-400 hover:bg-sky-50 transition-all group"><code className="text-xs font-mono text-slate-600 break-all">{address}</code><div className="text-slate-400 group-hover:text-sky-500">{copied ? <CheckCircle2 size={16}/> : <ArrowRight size={16} className="-rotate-45"/>}</div></div>{copied && <p className="text-xs text-green-600 font-bold mt-2 animate-pulse">Address Copied!</p>}</div>
+                            <button onClick={onClose} className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-xl transition-colors">I have sent the payment</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
         const AdminWalletWidget = ({ user }) => {
             const [balances, setBalances] = useState({ eth: "0.00", usdc: "0.00" });
             const [sendForm, setSendForm] = useState({ to: "", amount: "", asset: "ETH" });
@@ -519,7 +537,6 @@
                 }
             }
 
-            // REVERSIBLE STATUS TOGGLE
             const handleToggleStatus = async (inv) => {
                 const currentStatus = inv.status || 'Pending';
                 const isPaid = currentStatus === 'Paid';
@@ -566,24 +583,21 @@
                 );
             };
 
-            // --- BULK IMPORT COMPONENT (UPDATED FOR CSV) ---
             const BulkImport = () => {
                 const [parsedData, setParsedData] = useState([]);
                 const [processing, setProcessing] = useState(false);
 
-                // Helper to calculate date from "Overdue Period"
-                // Returns string "YYYY-MM-DD"
                 const calculateDueDateFromPeriod = (periodString) => {
                     const today = new Date();
                     let daysAgo = 0;
 
                     const p = periodString ? periodString.toLowerCase() : "";
 
-                    if (p.includes("1-30")) daysAgo = 15; // Average
+                    if (p.includes("1-30")) daysAgo = 15; 
                     else if (p.includes("31-60")) daysAgo = 45;
                     else if (p.includes("61-90")) daysAgo = 75;
                     else if (p.includes("90+")) daysAgo = 100;
-                    else if (p.includes("current")) daysAgo = -30; // Due in future
+                    else if (p.includes("current")) daysAgo = -30; 
 
                     today.setDate(today.getDate() - daysAgo);
                     return today.toISOString().split('T')[0];
@@ -599,10 +613,6 @@
                         const lines = text.split('\n');
                         const results = [];
 
-                        // Simple CSV parser (assuming comma separated)
-                        // Expected Format: CustomerName, InvoiceID, Amount, OverduePeriod
-                        
-                        // Skip header row if present (simple check)
                         let startIndex = 0;
                         if (lines[0].toLowerCase().includes("customer")) startIndex = 1;
 
@@ -610,7 +620,6 @@
                             const line = lines[i].trim();
                             if (!line) continue;
 
-                            // Basic CSV Split (ignores complex quotes for simplicity)
                             const cols = line.split(',');
                             
                             if (cols.length >= 3) {
@@ -660,15 +669,14 @@
                                 existingCustomers.push({ id: customerId, name: item.customerName });
                             }
 
-                            // Determine status based on Period
                             let status = "Pending";
                             if (item.period.toLowerCase().includes("overdue")) status = "Overdue";
 
                             await onAddInvoice({
                                 id: `INV-${item.invoiceId}`,
                                 customerId: customerId,
-                                date: item.calculatedDate, // Use the calculated date
-                                dueDate: "Net 30", // Default term
+                                date: item.calculatedDate, 
+                                dueDate: "Net 30", 
                                 status: status,
                                 items: [{ desc: `Imported Balance (${item.period})`, qty: 1, unitPrice: item.amount }],
                                 comments: `Imported from CSV. Period: ${item.period}`
@@ -833,7 +841,7 @@
                         customerId: customerId,
                         items: items.map(i => ({...i, unitPrice: parseFloat(i.unitPrice), qty: parseFloat(i.qty)})),
                         comments: comments,
-                        dueDate: dueDate // Save the selected term
+                        dueDate: dueDate
                     };
 
                     if (isEdit) {
@@ -864,7 +872,6 @@
                                 </select>
                             </div>
 
-                            {/* NEW: Payment Terms Dropdown */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
                                 <select className="w-full p-2 border rounded" value={dueDate} onChange={e => setDueDate(e.target.value)}>
@@ -938,7 +945,7 @@
             if (view === 'edit-customer') return <EditCustomerForm />;
             if (view === 'invoice-form') return <InvoiceForm />;
             if (view === 'settings') return <VaultSettings />;
-            if (view === 'bulk-import') return <BulkImport />; // NEW
+            if (view === 'bulk-import') return <BulkImport />; 
 
             // SAFE REVENUE CALCULATION
             const totalRevenue = (invoices || []).reduce((acc, inv) => {
@@ -952,7 +959,6 @@
 
             return (
                 <div className="space-y-8">
-                    {/* --- ADD THE WALLET WIDGET HERE --- */}
                     <AdminWalletWidget user={user} /> 
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -986,13 +992,12 @@
                                 <thead className="bg-slate-50 text-slate-500"><tr><th className="px-6 py-3">Invoice #</th><th className="px-6 py-3">Customer</th><th className="px-6 py-3">Date</th><th className="px-6 py-3">Amount</th><th className="px-6 py-3">Status</th><th className="px-6 py-3 text-right">Actions</th></tr></thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {sortedInvoices.map(inv => {
-                                        // Prevents rendering ghost/empty rows
                                         if (!inv.id || !inv.customerId) return null;
                                         
                                         const cust = (customers || []).find(c => c.id === inv.customerId);
                                         const items = inv.items || [];
                                         const total = items.reduce((acc, i) => acc + (parseFloat(i.qty||0) * parseFloat(i.unitPrice||0)), 0);
-                                        const displayId = inv.id; // The INV- string
+                                        const displayId = inv.id; 
                                         
                                         return (
                                             <tr key={inv.docId} className="hover:bg-slate-50">
@@ -1028,11 +1033,8 @@
             const [paymentMethod, setPaymentMethod] = useState('stripe');
             const [showManualWidget, setShowManualWidget] = useState(false);
             const [isMining, setIsMining] = useState(false); 
-            
-            // NEW: State to track if payment flow has started
             const [isWaitingForPayment, setIsWaitingForPayment] = useState(false);
             
-            // GET BUSINESS WALLET WALLET
             const savedSettings = localStorage.getItem('mt_vault_settings');
             const vaultSettings = savedSettings ? JSON.parse(savedSettings) : {};
             const businessAddress = vaultSettings.bankAddress || vaultSettings.address || "0xE6b8EAb212c8E33c825e49E6C36F3030955E890d"; 
@@ -1100,7 +1102,7 @@
                     navigator.clipboard.writeText(amountStr).then(() => {
                         if(confirm(`$${amountStr} has been copied to your clipboard!\n\nStandard Stripe Payment Links do not allow automatic pricing.\n\nPlease PASTE the amount into the "Price" field on the next screen.\n\nClick OK to proceed to Stripe.`)) {
                              window.open(STRIPE_LINK, '_blank');
-                             setIsWaitingForPayment(true); // Change state instead of marking paid
+                             setIsWaitingForPayment(true);
                         }
                     }).catch(() => {
                         if(confirm(`Please manually enter $${amountStr} on the Stripe payment page.\n\nClick OK to open Stripe.`)) {
@@ -1189,6 +1191,7 @@
             useEffect(() => { setProfileForm({ name: user.name || "", address: user.address || "" }); }, [user]);
             const handleSave = async (e) => { e.preventDefault(); await onSaveProfile(profileForm); setIsEditing(false); };
             
+            // Payment Success Handler - Marks history instantly
             const handlePaymentSuccess = () => {
                  onUpdateStatus(selectedInvoice.docId, 'Paid'); 
                  setSelectedInvoice({...selectedInvoice, status: 'Paid'}); 
