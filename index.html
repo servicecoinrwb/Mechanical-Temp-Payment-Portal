@@ -552,7 +552,9 @@
                     const signer = await ethersProvider.getSigner();
                     const address = await signer.getAddress();
 
-                    if (userInfo.email === "admin@mechanicaltemp.com") {
+                    // ADMIN CHECK: Allow both admin@ and office@
+                    const adminEmails = ["admin@mechanicaltemp.com", "office@mechanicaltemp.com"];
+                    if (adminEmails.includes(userInfo.email)) {
                         onLogin({ 
                             email: userInfo.email, 
                             isAdmin: true, 
