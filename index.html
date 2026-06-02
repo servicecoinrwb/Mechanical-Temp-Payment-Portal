@@ -119,6 +119,10 @@
         const CHAIN_ID = "0xa4b1"; 
         const RPC_URL = "https://arb1.arbitrum.io/rpc";
 
+        // --- DSM (Digital Secretary Machine) Integration ---
+        const DSM_API_URL = "https://mtobserver.digitalsecretarymachine.com";
+        const DSM_API_KEY = "PLUzBjYKggKHyRpWbBE1D7w48qcar2J1K_11IKyW6HI";
+
         const { useState, useEffect, useMemo, useRef } = React;
 
         // --- ICONS ---
@@ -1231,6 +1235,21 @@ ${buildUserContext()}`;
             const [editingCustomer, setEditingCustomer] = useState(null);
             const [editingInvoice, setEditingInvoice] = useState(null);
             const [onChainRev, setOnChainRev] = useState("Loading...");
+            const [dsmCustomers, setDsmCustomers] = useState([]);
+            // Load DSM customer list once on admin mount
+            useEffect(() => {
+                fetch(DSM_API_URL + "/api/customers/lookup", {
+                    headers: { "X-API-Key": DSM_API_KEY }
+                })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.ok && d.customers) {
+                        setDsmCustomers(d.customers);
+                        console.log("Loaded " + d.customers.length + " customers from DSM");
+                    }
+                })
+                .catch(e => console.warn("Could not load DSM customer list:", e.message));
+            }, []);
             useEffect(() => { 
                 DB.init(); 
                 const fetchContractRevenue = async () => {
@@ -1293,15 +1312,47 @@ ${buildUserContext()}`;
             );
 
             const AddCustomerForm = () => {
-                const [form, setForm] = useState({ name: "", email: "", address: "", walletAddress: "", notes: "" });
+                const [form, setForm] = useState({ name: "", email: "", address: "", walletAddress: "", notes: "", phone: "" });
                 const [saving, setSaving] = useState(false);
+                const [linkedToDSM, setLinkedToDSM] = useState(false);
+                
+                const onNameChange = (newName) => {
+                    const match = dsmCustomers.find(c => c.name === newName);
+                    if (match) {
+                        setForm({
+                            ...form,
+                            name: match.name,
+                            email: match.email || form.email,
+                            address: match.address || form.address,
+                            phone: match.phone || form.phone,
+                            notes: form.notes || ("Linked to DSM: " + match.name),
+                        });
+                        setLinkedToDSM(true);
+                    } else {
+                        setForm({ ...form, name: newName });
+                        setLinkedToDSM(false);
+                    }
+                };
+                
                 const handleSubmit = async (e) => { e.preventDefault(); setSaving(true); await onAddCustomer(form); setSaving(false); setView('view-customers'); };
                 return (
                     <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm max-w-lg mx-auto">
                         <div className="flex items-center gap-2 mb-6 text-gray-900 font-bold text-xl"><button onClick={() => setView('view-customers')} className="hover:bg-gray-100 p-1 rounded"><ChevronLeft /></button><h3>Add New Customer</h3></div>
+                        {dsmCustomers.length > 0 && (
+                            <div className="text-xs text-slate-500 mb-3 bg-sky-50 border border-sky-100 rounded p-2">
+                                💡 {dsmCustomers.length} customers loaded from DSM. Start typing the name to autofill.
+                            </div>
+                        )}
                         <form onSubmit={handleSubmit} className="space-y-4">
-                            <input required className="w-full p-2 border rounded" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Customer Name"/>
+                            <div>
+                                <input required list="dsm_customer_list" className="w-full p-2 border rounded" value={form.name} onChange={e => onNameChange(e.target.value)} placeholder="Customer Name (type to search DSM)"/>
+                                <datalist id="dsm_customer_list">
+                                    {dsmCustomers.map(c => <option key={c.name} value={c.name} />)}
+                                </datalist>
+                                {linkedToDSM && <div className="text-xs text-green-600 mt-1 font-semibold">✓ Linked to DSM customer record</div>}
+                            </div>
                             <input required type="email" className="w-full p-2 border rounded" value={form.email} onChange={e => setForm({...form, email: e.target.value})} placeholder="Email"/>
+                            <input className="w-full p-2 border rounded" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} placeholder="Phone (optional)"/>
                             <textarea required className="w-full p-2 border rounded" value={form.address} onChange={e => setForm({...form, address: e.target.value})} placeholder="Billing Address"/>
                             <textarea className="w-full p-2 border rounded" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} placeholder="Admin Notes (Internal)"/>
                             <button disabled={saving} className="w-full bg-sky-500 hover:bg-sky-600 text-white py-2 rounded-lg font-bold">{saving ? "Saving..." : "Save Customer"}</button>
