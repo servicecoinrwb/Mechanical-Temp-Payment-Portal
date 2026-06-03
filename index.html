@@ -1053,7 +1053,7 @@ ${buildUserContext()}`;
                     const tx = await contract.payInvoice(invoice.id, amount6);
                     alert(`Transaction Sent! Hash: ${tx.hash}`);
                     await tx.wait();
-                    onPaymentSuccess();
+                    onPaymentSuccess({ paymentMethod: 'usdc_arbitrum', paymentReference: tx.hash });
                 } catch (e) { console.error(e); alert("Payment failed: " + (e.reason || e.message)); } 
                 finally { setIsMining(false); }
             };
@@ -1094,7 +1094,7 @@ ${buildUserContext()}`;
                             </>) : (
                                 <div className="text-center py-4">
                                     <div className="mb-4 text-green-600 bg-green-50 p-4 rounded-xl border border-green-100"><p className="font-bold">Payment Link Opened</p><p className="text-sm">Please complete the payment in the new tab.</p></div>
-                                    <button onClick={onPaymentSuccess} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-lg mb-3">Yes, I have completed payment</button>
+                                    <button onClick={() => onPaymentSuccess({ paymentMethod, paymentReference: null })} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-lg mb-3">Yes, I have completed payment</button>
                                     <button onClick={() => setIsWaitingForPayment(false)} className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 rounded-xl">Cancel / Go Back</button>
                                 </div>
                             )}
@@ -1111,9 +1111,59 @@ ${buildUserContext()}`;
             const [profileForm, setProfileForm] = useState({ name: user.name || "", address: user.address || "" });
             useEffect(() => { setProfileForm({ name: user.name || "", address: user.address || "" }); }, [user]);
             const handleSave = async (e) => { e.preventDefault(); await onSaveProfile(profileForm); setIsEditing(false); };
-            const handlePaymentSuccess = () => { 
-                if (selectedInvoice.docId) onUpdateStatus(selectedInvoice.docId, 'Paid'); 
-                setSelectedInvoice({...selectedInvoice, status: 'Paid'}); 
+            const handlePaymentSuccess = async (paymentInfo = {}) => {
+                const { paymentMethod = 'manual', paymentReference = null } = paymentInfo;
+                
+                // If this is a DSM proposal, call the DSM mark-invoice-paid endpoint
+                if (selectedInvoice._dsm && selectedInvoice._proposalId) {
+                    try {
+                        const total = (selectedInvoice.items || []).reduce((acc, i) => 
+                            acc + (parseFloat(i.qty || 0) * parseFloat(i.unitPrice || 0)), 0);
+                        const r = await fetch(DSM_API_URL + "/api/portal/mark-invoice-paid", {
+                            method: 'POST',
+                            headers: { 
+                                'Content-Type': 'application/json',
+                                'X-API-Key': DSM_API_KEY 
+                            },
+                            body: JSON.stringify({
+                                proposal_id: selectedInvoice._proposalId,
+                                amount: total,
+                                payment_method: paymentMethod,
+                                payment_reference: paymentReference,
+                                payer_email: user.email || '',
+                            })
+                        });
+                        const j = await r.json();
+                        if (j.ok) {
+                            console.log('DSM invoice marked paid:', j);
+                        } else {
+                            console.warn('DSM mark-paid returned error:', j.error);
+                        }
+                    } catch (e) {
+                        console.warn('DSM mark-paid network error:', e.message);
+                    }
+                }
+                
+                // Firestore-side update (legacy / non-DSM invoices)
+                if (selectedInvoice.docId && !selectedInvoice._dsm) {
+                    onUpdateStatus(selectedInvoice.docId, 'Paid');
+                }
+                
+                setSelectedInvoice({...selectedInvoice, status: 'Paid'});
+                
+                // Refresh DSM data so the dashboard reflects the new paid state on next render
+                if (user && user.email && !user.isAdmin) {
+                    setTimeout(() => {
+                        fetch(DSM_API_URL + "/api/portal/my-data?email=" + encodeURIComponent(user.email), {
+                            headers: { "X-API-Key": DSM_API_KEY }
+                        })
+                        .then(r => r.json())
+                        .then(d => {
+                            if (d.ok) setDsmData(d);
+                        })
+                        .catch(e => console.warn('Refresh failed:', e.message));
+                    }, 1500);
+                }
             };
             if (selectedInvoice) return <InvoiceDetail invoice={selectedInvoice} customer={user} onBack={() => setSelectedInvoice(null)} onPaymentSuccess={handlePaymentSuccess} />;
             
@@ -1759,7 +1809,7 @@ ${buildUserContext()}`;
                         </div>
                     </div>
                     <div className="flex gap-4 flex-wrap">
-                        <button onClick={() => { setEditingInvoice(null); setView('invoice-form'); }} className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm"><FileText size={18} /> New Invoice</button>
+                        <a href={DSM_API_URL + "/quote-builder?source=portal"} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-medium shadow-sm no-underline"><FileText size={18} /> New Invoice<ExternalLink size={14} /></a>
                         <button onClick={() => setView('view-customers')} className="flex items-center gap-2 bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-slate-50"><Users size={18} /> Manage Customers</button>
                         <button onClick={() => setView('settings')} className="ml-auto flex items-center gap-2 text-slate-500 hover:text-slate-800 font-medium"><Settings size={20} /> Vault Settings</button>
                     </div>
