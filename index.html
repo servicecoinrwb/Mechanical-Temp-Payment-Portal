@@ -1402,7 +1402,7 @@ ${buildUserContext()}`;
             );
         };
 
-        const AdminDashboard = ({ user, customers, invoices, adminInvoices, adminInvoicesSummary, adminLoading, onAddCustomer, onAddInvoice, onUpdateInvoice, onDeleteCustomer, onDeleteInvoice, onUpdateStatus }) => {
+        const AdminDashboard = ({ user, customers, dsmCustomersAdmin, invoices, adminInvoices, adminInvoicesSummary, adminLoading, onAddCustomer, onAddInvoice, onUpdateInvoice, onDeleteCustomer, onDeleteInvoice, onUpdateStatus }) => {
             const [view, setView] = useState('dashboard');
             const [vaultSettings, setVaultSettings] = useState(DB.getVaultSettings());
             const [editingCustomer, setEditingCustomer] = useState(null);
@@ -1454,35 +1454,112 @@ ${buildUserContext()}`;
                 if(confirm(isPaid ? `Mark #${inv.id} as PENDING?` : `Mark #${inv.id} as PAID?`)) await onUpdateStatus(inv.docId, newStatus);
             }
 
-            const CustomerList = () => (
+            // Build merged customer list: DSM base + Firestore portal overlay (for wallet match)
+            const mergedCustomers = (() => {
+                // Index Firestore customers by email + wallet
+                const fsByEmail = {};
+                const fsByName = {};
+                (customers || []).forEach(c => {
+                    if (c.email) fsByEmail[c.email.toLowerCase()] = c;
+                    if (c.name) fsByName[c.name.toLowerCase()] = c;
+                });
+                // Start with all DSM customers
+                const merged = (dsmCustomersAdmin || []).map(dsm => {
+                    const email = (dsm.email || '').toLowerCase();
+                    const name = (dsm.name || '').toLowerCase();
+                    const fsMatch = fsByEmail[email] || fsByName[name];
+                    return {
+                        name: dsm.name,
+                        email: dsm.email,
+                        phone: dsm.phone,
+                        address: dsm.address,
+                        contactName: dsm.contactName,
+                        walletAddress: fsMatch?.walletAddress || null,
+                        firestoreId: fsMatch?.id || null,
+                        firestoreData: fsMatch || null,
+                        _hasPortalAccount: !!fsMatch,
+                        _source: 'DSM',
+                    };
+                });
+                // Also include Firestore-only customers (no DSM match)
+                const dsmEmails = new Set(merged.map(c => (c.email || '').toLowerCase()).filter(Boolean));
+                const dsmNames = new Set(merged.map(c => (c.name || '').toLowerCase()).filter(Boolean));
+                (customers || []).forEach(c => {
+                    const email = (c.email || '').toLowerCase();
+                    const name = (c.name || '').toLowerCase();
+                    if (!dsmEmails.has(email) && !dsmNames.has(name)) {
+                        merged.push({
+                            ...c,
+                            firestoreId: c.id,
+                            firestoreData: c,
+                            _hasPortalAccount: true,
+                            _source: 'Portal-only',
+                        });
+                    }
+                });
+                return merged.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            })();
+            const portalLinkedCount = mergedCustomers.filter(c => c._hasPortalAccount).length;
+            
+            const CustomerList = () => {
+                const [filter, setFilter] = useState("");
+                const filtered = filter 
+                    ? mergedCustomers.filter(c => 
+                        (c.name || '').toLowerCase().includes(filter.toLowerCase()) ||
+                        (c.email || '').toLowerCase().includes(filter.toLowerCase()) ||
+                        (c.address || '').toLowerCase().includes(filter.toLowerCase())
+                      )
+                    : mergedCustomers;
+                return (
                 <div className="space-y-6">
-                    <div className="flex items-center gap-2 mb-4">
+                    <div className="flex items-center gap-2 mb-4 flex-wrap">
                         <button onClick={() => setView('dashboard')} className="hover:bg-gray-100 p-2 rounded-full"><ChevronLeft size={20} /></button>
                         <h2 className="text-2xl font-bold text-gray-900">Manage Customers</h2>
+                        <span className="text-sm text-slate-500">({mergedCustomers.length} total · {portalLinkedCount} with portal account)</span>
                         <button onClick={() => setView('add-customer')} className="ml-auto bg-sky-500 hover:bg-sky-600 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 shadow-sm"><Plus size={16} /> Add New</button>
                     </div>
+                    <input type="text" value={filter} onChange={e => setFilter(e.target.value)} placeholder="Search by name, email, or address..." className="w-full p-3 border border-gray-200 rounded-lg text-sm" />
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 text-slate-500"><tr><th className="px-6 py-4">Name</th><th className="px-6 py-4">Email</th><th className="px-6 py-4">Address</th><th className="px-6 py-4">Wallet</th><th className="px-6 py-4 text-right">Actions</th></tr></thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {(customers || []).length === 0 ? <tr><td colSpan="5" className="p-8 text-center text-gray-400">No customers found.</td></tr> : (customers || []).map(c => (
-                                    <tr key={c.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4 font-medium text-gray-900">{c.name}</td>
-                                        <td className="px-6 py-4 text-gray-600">{c.email}</td>
-                                        <td className="px-6 py-4 text-gray-500 truncate max-w-xs">{c.address}</td>
-                                        <td className="px-6 py-4 font-mono text-xs text-sky-600">{c.walletAddress ? c.walletAddress.substring(0,6)+'...'+c.walletAddress.substring(c.walletAddress.length-4) : '-'}</td>
-                                        <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                            <button onClick={() => handleEditCustomer(c)} className="text-gray-400 hover:text-blue-600 p-2" title="Edit"><Edit size={18} /></button>
-                                            <button onClick={() => handleFundGas(c.walletAddress)} className="text-gray-400 hover:text-yellow-600 p-2" title="Fund Gas"><Fuel size={18} /></button>
-                                            <button onClick={() => { if(confirm(`Delete ${c.name}?`)) onDeleteCustomer(c.id); }} className="text-gray-400 hover:text-red-600 p-2"><Trash2 size={18} /></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 text-slate-500"><tr><th className="px-4 py-3">Name</th><th className="px-4 py-3">Email</th><th className="px-4 py-3">Phone</th><th className="px-4 py-3">Address</th><th className="px-4 py-3">Portal</th><th className="px-4 py-3 text-right">Actions</th></tr></thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {filtered.length === 0 ? <tr><td colSpan="6" className="p-8 text-center text-gray-400">No customers match your search.</td></tr> : filtered.slice(0, 200).map((c, idx) => (
+                                        <tr key={(c.email || c.name || idx) + "_" + idx} className="hover:bg-slate-50">
+                                            <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
+                                            <td className="px-4 py-3 text-gray-600 truncate max-w-xs">{c.email || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-gray-600">{c.phone || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3 text-gray-500 truncate max-w-xs">{c.address || <span className="text-gray-300">—</span>}</td>
+                                            <td className="px-4 py-3">
+                                                {c._hasPortalAccount ? (
+                                                    <div className="flex flex-col">
+                                                        <span className="text-xs font-semibold text-green-700">🔗 Linked</span>
+                                                        {c.walletAddress && <span className="font-mono text-xs text-sky-600">{c.walletAddress.substring(0,6)+'…'+c.walletAddress.substring(c.walletAddress.length-4)}</span>}
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-gray-400">DSM-only</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="flex justify-end gap-1">
+                                                    {c.firestoreData && (
+                                                        <>
+                                                            <button onClick={() => handleEditCustomer(c.firestoreData)} className="text-gray-400 hover:text-blue-600 p-2" title="Edit portal account"><Edit size={16} /></button>
+                                                            {c.walletAddress && <button onClick={() => handleFundGas(c.walletAddress)} className="text-gray-400 hover:text-yellow-600 p-2" title="Fund Gas"><Fuel size={16} /></button>}
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {filtered.length > 200 && <div className="bg-slate-50 px-4 py-3 text-center text-xs text-slate-500 border-t">Showing first 200 of {filtered.length} results</div>}
+                        </div>
                     </div>
                 </div>
-            );
+                );
+            };
 
             const AddCustomerForm = () => {
                 const [form, setForm] = useState({ name: "", email: "", address: "", walletAddress: "", notes: "", phone: "" });
@@ -1712,6 +1789,26 @@ ${buildUserContext()}`;
             const [adminInvoices, setAdminInvoices] = useState([]);
             const [adminInvoicesSummary, setAdminInvoicesSummary] = useState({total_billed:0, total_paid:0, total_open:0});
             const [adminLoading, setAdminLoading] = useState(false);
+            const [dsmCustomersAdmin, setDsmCustomersAdmin] = useState([]);
+            
+            // Fetch full DSM customer list for admin (~398 customers)
+            useEffect(() => {
+                if (!user || !user.isAdmin) {
+                    setDsmCustomersAdmin([]);
+                    return;
+                }
+                fetch(DSM_API_URL + "/api/customers/lookup", {
+                    headers: { "X-API-Key": DSM_API_KEY }
+                })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.ok && d.customers) {
+                        setDsmCustomersAdmin(d.customers);
+                        console.log("Admin: loaded " + d.customers.length + " DSM customers");
+                    }
+                })
+                .catch(e => console.warn("Admin DSM customers load failed:", e.message));
+            }, [user?.isAdmin]);
             
             // Fetch DSM admin invoices on admin login
             useEffect(() => {
@@ -1809,7 +1906,7 @@ ${buildUserContext()}`;
                         {!user ? (
                             <LoginScreen onLogin={(u) => setUser(u)} />
                         ) : user.isAdmin ? (
-                            <AdminDashboard user={user} customers={customers} invoices={invoices} adminInvoices={adminInvoices} adminInvoicesSummary={adminInvoicesSummary} adminLoading={adminLoading} onAddCustomer={DB.addCustomer} onDeleteCustomer={DB.deleteCustomer} onAddInvoice={DB.addInvoice} onUpdateInvoice={DB.updateInvoice} onDeleteInvoice={DB.deleteInvoice} onUpdateStatus={DB.updateInvoiceStatus} />
+                            <AdminDashboard user={user} customers={customers} dsmCustomersAdmin={dsmCustomersAdmin} invoices={invoices} adminInvoices={adminInvoices} adminInvoicesSummary={adminInvoicesSummary} adminLoading={adminLoading} onAddCustomer={DB.addCustomer} onDeleteCustomer={DB.deleteCustomer} onAddInvoice={DB.addInvoice} onUpdateInvoice={DB.updateInvoice} onDeleteInvoice={DB.deleteInvoice} onUpdateStatus={DB.updateInvoiceStatus} />
                         ) : (
                             <CustomerDashboard user={resolvedUser} invoices={invoices} dsmData={dsmData} dsmLoading={dsmLoading} onUpdateStatus={DB.updateInvoiceStatus} onSaveProfile={handleSaveProfile} onOpenScheduler={() => setShowScheduler(true)} />
                         )}
