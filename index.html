@@ -1131,6 +1131,7 @@ ${buildUserContext()}`;
                                 payment_method: paymentMethod,
                                 payment_reference: paymentReference,
                                 payer_email: user.email || '',
+                                payer_wallet: user.walletAddress || '',
                             })
                         });
                         const j = await r.json();
